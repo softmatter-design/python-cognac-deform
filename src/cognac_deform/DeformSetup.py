@@ -13,9 +13,8 @@ def main():
 	print("このスクリプトを直接読んでも、初期状態が入っていません。")
 	exit(1)
 ################################################################################
-class Setup:
-	def __init__(self, path_mod, Ver_Cognac, calc_dir, f_data, core, stress_eval, rate_list, time_div, deform_max, res, def_mode):
-		self.path_mod = path_mod
+class DeformSetup:
+	def __init__(self, Ver_Cognac, calc_dir, f_data, core, stress_eval, rate_list, time_div, deform_max, res, def_mode):
 		self.Ver = Ver_Cognac
 		self.calc_dir = calc_dir
 		self.f_data = f_data
@@ -203,11 +202,10 @@ class Setup:
 	def script_content(self):
 		script = '#!/usr/bin/env python \n# -*- coding: utf-8 -*-\n################################\n'
 		script += 'import os \nimport sys \n'
-		script += 'path_mod = "' + self.path_mod + '"\n'
-		script += 'sys.path.append(path_mod)\n'
-		script += 'from network_evaluation import Read_Shear as rs\n################################\n'
+		script += 'import cognac_deform import Read_Shear as rs\n################################\n'
 		# script += 'func = ' + str(func) + '\nnu = ' + str(nu) + '\nstructure = "' + structure + '"\n'
 		script += '################################\n'
+		script += 'rs = cognac_deform.Read_Shear \n'
 		script += 't_udf_list = rs.file_listing()\n'
 		script += 'stress_data = rs.calc_stress_all(t_udf_list)\n'
 		script += 'target_list = rs.save_data(stress_data, t_udf_list)\n'
