@@ -2,6 +2,7 @@
 
 from setuptools import setup, find_packages
 
+
 setup(
     name='cognac_deform',
     version='0.1.2',
