@@ -1,1 +1,1 @@
-from .DeformSetup import DeformSetup
+from .DeformSetup import deform
