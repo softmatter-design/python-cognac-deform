@@ -45,8 +45,7 @@ import cognac_deform
 ##### Main #####
 def main():
 	cognac_deform.deform()
-	# setup = cognac_deform.DeformSetup(Ver_Cognac, calc_dir, f_data, core, stress_eval, rate_list, time_div, deform_max, res, def_mode)
-	# setup.make_all()
+
 	return
 ################################################################################
 #      Main     #

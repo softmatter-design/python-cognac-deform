@@ -4,12 +4,15 @@
 from UDFManager import *
 
 import argparse
+import codecs
 import sys
 import os
 import shutil
 import numpy as np
 import platform
 import pandas as pd
+
+import cognac_deform.values as val
 ################################################################################
 # def main():
 # 	print("このスクリプトを直接読んでも、初期状態が入っていません。")
@@ -35,34 +38,18 @@ import pandas as pd
 ##### Main #####
 # 
 def deform():
-	read_arg()
-	# # 平衡計算したUDFファイルとその場所を選択
-	# t_udf, data_dir = self.file_select()
-	# #
-	# # func, nu, structure = self.read_data(data_dir)
-	# #
-	# base = self.make_base_udf(t_udf)
-	# #
-	# self.make_batch(base)
-	# #
-	# self.make_script()
+	read_all()
+	make_base_udf()
 	return
 
 ############################################################################
 ##### Function #####
 # 平衡計算したUDFファイルとその場所を選択
-def file_select(self):
-	param = sys.argv
-	if len(param) == 1:
-		print("usage: python", param[0], "Honya_out.udf")
-		exit(1)
-	elif not os.access(param[1],os.R_OK):
-		print(param[1], "not exists.")
-		exit(1)
-	else:
-		target = param[1]
-		data_dir = os.path.dirname(target)
-	return target, data_dir
+def read_all():
+	read_arg()
+	read_nw_cond()
+	read_sim_cond()
+	return
 
 def read_arg():
 	parser = argparse.ArgumentParser(description='Select udf file to read !')
@@ -71,54 +58,164 @@ def read_arg():
 	if args.file:
 		if len(args.file.split('.')) != 2 or args.file.split('.')[1] != 'udf':
 			print('the file name you selected is not udf file !')
+			sys.exit('select proper udf file to read.')
+		elif not os.access(args.file, os.R_OK):
+			sys.exit(args.file, 'seems not exist !')
 		else:
-			print('Selected udf file is ' + args.file)
+			val.read_udf = args.file
+			# print('Selected udf file is ' + val.read_udf)
 	else:
-		print('Iniput')
+		print('no udf file is selected')
+		sys.exit('select proper udf file to read.')
 	return
-# 
-def read_data(self, data_dir):
-	t_data = os.path.join(data_dir, self.f_data)
-	if not os.path.exists(t_data):
-		exit("network.dat is not exist!")
+
+# 計算条件から、ホモポリマーとネットワークを判断し、chain_list を読み出す。
+def read_nw_cond():
+	# 計算対象の条件を読み取る
+	if not os.access('target_condition.udf', os.R_OK):
+		print("'target_condition.udf' is not exists.")
+		exit(1)
 	else:
-		with open(t_data, 'r') as f:
-			calc_cond = f.readlines()[-1].strip().split('\t')
-		func = calc_cond[3]
-		nu = calc_cond[4]
-		structure = calc_cond[5]
-		return func, nu, structure
+		cond_u = UDFManager('target_condition.udf')
+		val.func = cond_u.get('TargetCond.NetWork.N_Strands')
+		val.nu = cond_u.get('TargetCond.System.Nu')
+	return
 
 # 
-def make_base_udf(self, t_udf):
-	if os.path.exists(self.calc_dir):
-		print("Use existing dir of ", self.calc_dir)
-	else:
-		print("Make new dir of ", self.calc_dir)
-		os.makedirs(self.calc_dir)
+def read_sim_cond():
 	#
-	base = os.path.join(self.calc_dir, self.base_udf)
-	print("Readin file = ", t_udf)
-	u = UDFManager(t_udf)
+	if not os.path.isfile('../deform_condition.udf'):
+		print()
+		print('In the parent directory, no "deform_condition.udf" is found !')
+		print('New one will be generated.')
+		print('Please, modify and save it !\n')
+		makenewudf()
+		input('Press ENTER to continue...')
+	else:
+		read_and_setcondition()
+	return
+
+###########################################
+# make new udf when not found.
+def makenewudf():
+	contents = '''
+	\\begin{def}
+	CalcConditions:{
+		Cognac_ver:select{"cognac112"} "使用する Cognac のバージョン",
+		Cores: int "計算に使用するコア数を指定"
+		} "Cognac による計算の条件を設定"
+	SimulationConditions:{
+		DeformMode:select{"Elong", "Shear"} "変形モードを選択",
+		DeformRate[]:float "これらは変形レートのリスト",
+		MaxDeformation:float "最大ひずみ",
+		Resolution:float "これは１ステップ計算での伸長度　Res = lambda/1_step"
+		} "計算ターゲットの条件を設定"
+	\end{def}	
+
+	\\begin{data}
+	CalcConditions:{"cognac112",1}
+	SimulationConditions:{
+	"Elong",
+	[1.0e-03,5.0e-03,1.0e-03,5.0e-04,1.0e-04,5.0e-05]
+	3.0,
+	1.0e-02
+	}
+	\end{data}
+	'''
+	###
+	with codecs.open('../deform_condition.udf', 'w', 'utf_8') as f:
+		f.write(contents)
+	return
+
+######################################
+# Read udf and setup initial conditions
+def read_and_setcondition():
+	dic={'y':True,'yes':True,'q':False,'quit':False}
+	while True:
+		# read udf
+		readconditionudf()
+		# select
+		init_calc()
+		print('Change UDF: type [r]eload')
+		print('Quit input process: type [q]uit')
+		inp = input('Condition is OK ==> [y]es >> ').lower()
+		if inp in dic:
+			inp = dic[inp]
+			break
+		print('##### \nRead Condition UDF again \n#####\n\n')
+	if inp:
+		# 計算用のディレクトリーを作成
+		# make_dir()
+		print("\n\nSetting UP progress !!")
+		return
+	else:
+		sys.exit("##### \nQuit !!")
+
+
+####################################
+# Read condition udf
+def readconditionudf():
+	u = UDFManager('../deform_condition.udf')
+	u.jump(-1)
+	##################
+	# 使用するCognacのバージョン
+	val.ver_Cognac = u.get('CalcConditions.Cognac_ver')
+	# 計算に使用するコア数
+	val.core = u.get('CalcConditions.Cores')
+	#######################################################
+	## 計算ターゲット
+	val.def_mode  = u.get('SimulationConditions.DeformMode')
+	val.rate_list = u.get('SimulationConditions.DeformRate[]')
+	val.deform_max = u.get('SimulationConditions.MaxDeformation')
+	val.resolution = u.get('SimulationConditions.Resolution')
+	#
+	val.calc_dir = val.def_mode + '_calculation'
+	return
+
+###############################################################
+def init_calc():
+	text = "################################################" + "\n"
+	text += "Cores used for simulation\t\t\t" + str(val.core ) + "\n"
+	text += "################################################" + "\n"
+	text += "Deform mode:\t\t\t\t" + str(val.def_mode) + "\n"
+	text += "変形レート:\t" + ', '.join(map(str, val.rate_list)) + "\n"
+	text += "最大ひずみ:\t\t\t\t" + str(val.deform_max) + "\n"
+	text += "Resolution:\t\t\t\t" + str(val.resolution) + "\n"
+	text += "################################################" + "\n"
+	print(text)
+	return
+
+
+# 
+def make_base_udf():
+	if os.path.exists(val.calc_dir):
+		print("Use existing dir of ", val.calc_dir)
+	else:
+		print("Make new dir of ", val.calc_dir)
+		os.makedirs(val.calc_dir)
+	#
+	val.base_udf = os.path.join(val.calc_dir, val.read_udf)
+	print("Readin file = ", val.read_udf)
+	u = UDFManager(val.read_udf)
 	u.jump(1)
 	u.eraseRecord(record_pos=-999,record_num=-999)
-	u.write(base)
-	return base
+	u.write(val.base_udf)
+	return
 
 # ファイル名を設定し、バッチファイルを作成
-def make_batch(self, base):
-	batch = "#!/bin/bash\n"
+def make_batch():
+	val.batch = "#!/bin/bash\n"
 	#
-	for rate in self.rate_list:
+	for rate in val.rate_list:
 		# UDFファイル名を設定
 		rate_str = "{0:4.0e}".format(rate)
-		if self.def_mode == 'elong':
+		if val.def_mode == 'elong':
 			uin = 'Elong_rate_' + rate_str + "_uin.udf"
-		elif self.def_mode == 'shear':
+		elif val.def_mode == 'shear':
 			uin = 'Shear_rate_' + rate_str + "_uin.udf"
 		# 
-		batch = self.make_title(batch, "Calculating rate=" + rate_str)
-		batch += self.Ver + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(self.core) +' \n'
+		batch = make_title("Calculating rate=" + rate_str)
+		batch += val.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(self.core) +' \n'
 		batch += 'python ' + self.stress_eval + '\n'
 		udf_in =  os.path.join(self.calc_dir, uin)
 		shutil.copy(base, udf_in)
@@ -137,9 +234,9 @@ def make_batch(self, base):
 
 
 #-----
-def mod_udf(self, udf_in, rate):
-	if self.def_mode == 'elong':
-		time_1_step = int(self.res/self.time_div/rate)
+def mod_udf():
+	if val.def_mode == 'elong':
+		time_1_step = int(val.resolution/self.time_div/rate)
 		time_total = time_1_step*(self.deform_max - 1)/self.res
 	elif self.def_mode == 'shear':
 		deform_time = self.deform_max/rate
@@ -198,12 +295,12 @@ def mod_udf(self, udf_in, rate):
 
 ###########################
 # ターミナルのタイトルを設定
-def make_title(self, batch, title):
+def make_title(title):
 	if platform.system() == "Windows":
-		batch += "title " + title + "\n"
+		val.batch += "title " + title + "\n"
 	elif platform.system() == "Linux":
-		batch += r'echo -ne "\033]0; ' + title + ' \007"' + '\n'
-	return batch
+		val.batch += r'echo -ne "\033]0; ' + title + ' \007"' + '\n'
+	return
 
 #######################
 # 必要なスクリプトを作成
