@@ -8,38 +8,16 @@ import codecs
 import sys
 import os
 import shutil
-import numpy as np
 import platform
-import pandas as pd
 
 import cognac_deform.values as val
-################################################################################
-# def main():
-# 	print("このスクリプトを直接読んでも、初期状態が入っていません。")
-# 	exit(1)
-# ################################################################################
-# class DeformSetup:
-# 	def __init__(self, Ver_Cognac, calc_dir, f_data, core, stress_eval, rate_list, time_div, deform_max, res, def_mode):
-# 		self.Ver = Ver_Cognac
-# 		self.calc_dir = calc_dir
-# 		self.f_data = f_data
-# 		self.core = core
-# 		self.stress_eval = stress_eval
-# 		#
-# 		self.rate_list = rate_list
-# 		self.time_div = time_div
-# 		self.deform_max = deform_max
-# 		self.res = res
-# 		self.def_mode = def_mode
-# 		#
-# 		self.base_udf = "base_uin.udf"
 
-############################################################################
 ##### Main #####
 # 
 def deform():
 	read_all()
 	make_base_udf()
+	make_batch()
 	return
 
 ############################################################################
@@ -175,12 +153,12 @@ def readconditionudf():
 ###############################################################
 def init_calc():
 	text = "################################################" + "\n"
-	text += "Cores used for simulation\t\t\t" + str(val.core ) + "\n"
+	text += "Cores used for simulation\t\t" + str(val.core ) + "\n"
 	text += "################################################" + "\n"
 	text += "Deform mode:\t\t\t\t" + str(val.def_mode) + "\n"
-	text += "変形レート:\t" + ', '.join(map(str, val.rate_list)) + "\n"
-	text += "最大ひずみ:\t\t\t\t" + str(val.deform_max) + "\n"
-	text += "Resolution:\t\t\t\t" + str(val.resolution) + "\n"
+	text += "Deform Rate:\t" + ', '.join(["{0:4.0e}".format(x) for x in val.rate_list]) + "\n"
+	text += "Maximum Strain:\t\t\t\t" + str(val.deform_max) + "\n"
+	text += "Resolution:\t\t\t\t" + str(round(val.resolution,4)) + "\n"
 	text += "################################################" + "\n"
 	print(text)
 	return
@@ -209,70 +187,74 @@ def make_batch():
 	for rate in val.rate_list:
 		# UDFファイル名を設定
 		rate_str = "{0:4.0e}".format(rate)
-		if val.def_mode == 'elong':
+		if val.def_mode == 'Elong':
 			uin = 'Elong_rate_' + rate_str + "_uin.udf"
-		elif val.def_mode == 'shear':
+		elif val.def_mode == 'Shear':
 			uin = 'Shear_rate_' + rate_str + "_uin.udf"
 		# 
-		batch = make_title("Calculating rate=" + rate_str)
-		batch += val.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(self.core) +' \n'
-		batch += 'python ' + self.stress_eval + '\n'
-		udf_in =  os.path.join(self.calc_dir, uin)
-		shutil.copy(base, udf_in)
-		self.mod_udf(udf_in, rate)
+		make_title("Calculating rate_" + rate_str)
+		val.batch += val.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(val.core) +' \n'
+		val.batch += 'evaluate_simpledeform\n'
+		udf_in =  os.path.join(val.calc_dir, uin)
+		# shutil.copy(val.base_udf, udf_in)
+		mod_udf(udf_in, rate)
 	# バッチファイルを作成
-	if self.def_mode == 'elong':
-		f_batch = os.path.join(self.calc_dir, '_elong_bat.bat')
-	elif self.def_mode == 'shear':
-		f_batch = os.path.join(self.calc_dir, '_shear_bat.bat')
-	
+	f_batch = os.path.join(val.calc_dir, '_deform.bat')
 	with open(f_batch, 'w') as f:
-		f.write(batch)
-		if platform.system() == "Linux":
-			os.chmod(f_batch, 0o777)
+		f.write(val.batch)
+	if platform.system() == "Linux":
+		os.chmod(f_batch, 0o777)
 	return
 
+###########################
+# ターミナルのタイトルを設定
+def make_title(title):
+	if platform.system() == "Windows":
+		val.batch += "title " + title + "\n"
+	elif platform.system() == "Linux":
+		val.batch += r'echo -ne "\033]0; ' + title + ' \007"' + '\n'
+	return
 
 #-----
-def mod_udf():
-	if val.def_mode == 'elong':
-		time_1_step = int(val.resolution/self.time_div/rate)
-		time_total = time_1_step*(self.deform_max - 1)/self.res
-	elif self.def_mode == 'shear':
-		deform_time = self.deform_max/rate
-		time_total = round(deform_time/self.time_div)
-		time_1_step = int(self.res/self.time_div/rate)
+def mod_udf(udf_in, rate):
+	if val.def_mode == 'Elong':
+		deform_time = (val.deform_max - 1)/rate
+	elif val.def_mode == 'Shear':
+		deform_time = val.deform_max/rate
 	#
-	u = UDFManager(udf_in)
+	time_total = round(deform_time/val.time_div)
+	time_1_step = round(val.resolution/val.time_div/rate)
+	#
+	u = UDFManager(val.base_udf)
 	# goto global data
 	u.jump(-1)
 
 	# Dynamics_Conditions
 	p = 'Simulation_Conditions.Dynamics_Conditions.'
-	u.put(100000.,			p + 'Max_Force')
-	u.put(self.time_div,	p + 'Time.delta_T')
-	u.put(time_total,		p + 'Time.Total_Steps')
-	u.put(time_1_step,		p + 'Time.Output_Interval_Steps')
-	u.put(1.0,				p + 'Temperature.Temperature')
-	u.put(0, 				p + 'Temperature.Interval_of_Scale_Temp')
-	u.put(0,				p + 'Pressure_Stress.Pressure')
+	u.put(100000.,		p + 'Max_Force')
+	u.put(val.time_div,	p + 'Time.delta_T')
+	u.put(time_total,	p + 'Time.Total_Steps')
+	u.put(time_1_step,	p + 'Time.Output_Interval_Steps')
+	u.put(1.0,			p + 'Temperature.Temperature')
+	u.put(0, 			p + 'Temperature.Interval_of_Scale_Temp')
+	u.put(0,			p + 'Pressure_Stress.Pressure')
 
 	# Deformation
-	if self.def_mode == 'elong':
+	if val.def_mode == 'Elong':
 		p = "Simulation_Conditions.Dynamics_Conditions.Deformation."
 		u.put('Cell_Deformation', 		p + 'Method')
 		u.put('Simple_Elongation', 		p + 'Cell_Deformation.Method')
 		u.put('Initial_Strain_Rate', 	p + 'Cell_Deformation.Simple_Elongation.Input_Method')
-		u.put(rate,	 		p + 'Cell_Deformation.Simple_Elongation.Initial_Strain_Rate.Rate')
+		u.put(rate,	 					p + 'Cell_Deformation.Simple_Elongation.Initial_Strain_Rate.Rate')
 		u.put(0.5, 						p + 'Cell_Deformation.Simple_Elongation.Poisson_Ratio')
 		u.put('z', 						p + 'Cell_Deformation.Simple_Elongation.Axis')
 		u.put(1, 						p + 'Cell_Deformation.Interval_of_Deform')
 		u.put(0, 						p + 'Cell_Deformation.Deform_Atom')
-	elif self.def_mode == 'shear':
+	elif val.def_mode == 'Shear':
 		p = "Simulation_Conditions.Dynamics_Conditions.Deformation."
-		u.put('Lees_Edwards', 		p + 'Method')
+		u.put('Lees_Edwards', 	p + 'Method')
 		u.put('Steady', 		p + 'Lees_Edwards.Method')
-		u.put(rate, 	p + 'Lees_Edwards.Steady.Shear_Rate')
+		u.put(rate, 			p + 'Lees_Edwards.Steady.Shear_Rate')
 	
 	# Output_Flags
 	u.put([1, 1, 1], 'Simulation_Conditions.Output_Flags.Structure')
@@ -293,33 +275,3 @@ def mod_udf():
 	u.write(udf_in)
 	return
 
-###########################
-# ターミナルのタイトルを設定
-def make_title(title):
-	if platform.system() == "Windows":
-		val.batch += "title " + title + "\n"
-	elif platform.system() == "Linux":
-		val.batch += r'echo -ne "\033]0; ' + title + ' \007"' + '\n'
-	return
-
-#######################
-# 必要なスクリプトを作成
-def make_script(self):
-	script = self.script_content()
-	with open(os.path.join(self.calc_dir, self.stress_eval),'w') as f:
-		f.write(script)
-	return
-
-# スクリプトの中身
-def script_content(self):
-	script = '#!/usr/bin/env python \n# -*- coding: utf-8 -*-\n################################\n'
-	script += 'import os \nimport sys \n'
-	script += 'import cognac_deform import Read_Shear as rs\n################################\n'
-	# script += 'func = ' + str(func) + '\nnu = ' + str(nu) + '\nstructure = "' + structure + '"\n'
-	script += '################################\n'
-	script += 'rs = cognac_deform.Read_Shear \n'
-	script += 't_udf_list = rs.file_listing()\n'
-	script += 'stress_data = rs.calc_stress_all(t_udf_list)\n'
-	script += 'target_list = rs.save_data(stress_data, t_udf_list)\n'
-	script += 'rs.plot(target_list)\n'
-	return script

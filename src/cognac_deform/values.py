@@ -16,7 +16,7 @@ rate_list = [1e-2, 1e-3, 5e-4] #
 # 伸長伸度
 deform_max = 4
 # これは１ステップ計算での伸長度　Res = lambda/1_step
-res = 0.02
+resolution = 0.02
 #
 time_div = 0.01
 
