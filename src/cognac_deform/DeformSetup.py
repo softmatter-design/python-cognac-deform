@@ -13,16 +13,15 @@ import platform
 import cognac_deform.values as val
 
 ##### Main #####
-# 
 def deform():
+	# 各種条件を読み取り
 	read_all()
-	make_base_udf()
+	# ファイル名を設定し、バッチファイルを作成
 	make_batch()
 	return
 
-############################################################################
-##### Function #####
-# 平衡計算したUDFファイルとその場所を選択
+###################################
+# 各種条件を読み取り
 def read_all():
 	read_arg()
 	read_nw_cond()
@@ -31,25 +30,24 @@ def read_all():
 
 def read_arg():
 	parser = argparse.ArgumentParser(description='Select udf file to read !')
-	parser.add_argument("-f", "--file", help="udf file name to read previous simulation")
+	parser.add_argument('udf', help="udf file name to read previous simulation")
 	args = parser.parse_args()
-	if args.file:
-		if len(args.file.split('.')) != 2 or args.file.split('.')[1] != 'udf':
+	if args.udf:
+		if len(args.udf.split('.')) != 2 or args.udf.split('.')[1] != 'udf':
 			print('the file name you selected is not udf file !')
 			sys.exit('select proper udf file to read.')
-		elif not os.access(args.file, os.R_OK):
-			sys.exit(args.file, 'seems not exist !')
+		elif not os.access(args.udf, os.R_OK):
+			sys.exit(args.udf, 'seems not exist !')
 		else:
-			val.read_udf = args.file
+			val.read_udf = args.udf
 			# print('Selected udf file is ' + val.read_udf)
 	else:
 		print('no udf file is selected')
 		sys.exit('select proper udf file to read.')
 	return
 
-# 計算条件から、ホモポリマーとネットワークを判断し、chain_list を読み出す。
+# 計算対象の条件を読み取る
 def read_nw_cond():
-	# 計算対象の条件を読み取る
 	if not os.access('target_condition.udf', os.R_OK):
 		print("'target_condition.udf' is not exists.")
 		exit(1)
@@ -59,7 +57,7 @@ def read_nw_cond():
 		val.nu = cond_u.get('TargetCond.System.Nu')
 	return
 
-# 
+# シミュレーション条件を設定する。
 def read_sim_cond():
 	#
 	if not os.path.isfile('../deform_condition.udf'):
@@ -70,10 +68,9 @@ def read_sim_cond():
 		makenewudf()
 		input('Press ENTER to continue...')
 	else:
-		read_and_setcondition()
+		read_and_set_condition()
 	return
 
-###########################################
 # make new udf when not found.
 def makenewudf():
 	contents = '''
@@ -105,13 +102,12 @@ def makenewudf():
 		f.write(contents)
 	return
 
-######################################
 # Read udf and setup initial conditions
-def read_and_setcondition():
+def read_and_set_condition():
 	dic={'y':True,'yes':True,'q':False,'quit':False}
 	while True:
 		# read udf
-		readconditionudf()
+		read_conditionudf()
 		# select
 		init_calc()
 		print('Change UDF: type [r]eload')
@@ -122,35 +118,33 @@ def read_and_setcondition():
 			break
 		print('##### \nRead Condition UDF again \n#####\n\n')
 	if inp:
-		# 計算用のディレクトリーを作成
-		# make_dir()
 		print("\n\nSetting UP progress !!")
+		# 計算用のディレクトリーを作成
+		make_dir()
+		# 
+		set_base()
 		return
 	else:
 		sys.exit("##### \nQuit !!")
 
-
-####################################
 # Read condition udf
-def readconditionudf():
+def read_conditionudf():
 	u = UDFManager('../deform_condition.udf')
 	u.jump(-1)
-	##################
 	# 使用するCognacのバージョン
 	val.ver_Cognac = u.get('CalcConditions.Cognac_ver')
 	# 計算に使用するコア数
 	val.core = u.get('CalcConditions.Cores')
-	#######################################################
 	## 計算ターゲット
 	val.def_mode  = u.get('SimulationConditions.DeformMode')
 	val.rate_list = u.get('SimulationConditions.DeformRate[]')
 	val.deform_max = u.get('SimulationConditions.MaxDeformation')
 	val.resolution = u.get('SimulationConditions.Resolution')
 	#
-	val.calc_dir = val.def_mode + '_calculation'
+	val.calc_dir = val.def_mode + '_calculation_read_' + val.read_udf.split('.')[0]
 	return
 
-###############################################################
+# 
 def init_calc():
 	text = "################################################" + "\n"
 	text += "Cores used for simulation\t\t" + str(val.core ) + "\n"
@@ -163,16 +157,17 @@ def init_calc():
 	print(text)
 	return
 
-
 # 
-def make_base_udf():
+def make_dir():
 	if os.path.exists(val.calc_dir):
 		print("Use existing dir of ", val.calc_dir)
 	else:
 		print("Make new dir of ", val.calc_dir)
 		os.makedirs(val.calc_dir)
-	#
-	val.base_udf = os.path.join(val.calc_dir, val.read_udf)
+	return
+
+def set_base():
+	val.base_udf = os.path.join(val.calc_dir, 'base.udf')
 	print("Readin file = ", val.read_udf)
 	u = UDFManager(val.read_udf)
 	u.jump(1)
@@ -180,6 +175,7 @@ def make_base_udf():
 	u.write(val.base_udf)
 	return
 
+#######################################
 # ファイル名を設定し、バッチファイルを作成
 def make_batch():
 	val.batch = "#!/bin/bash\n"
