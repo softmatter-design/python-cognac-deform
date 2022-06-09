@@ -190,9 +190,8 @@ def make_batch():
 		# 
 		make_title("Calculating rate_" + rate_str)
 		val.batch += val.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(val.core) +' \n'
-		val.batch += 'evaluate_simpledeform\n'
+		val.batch += 'evaluate_simpledeform -f ' + str(val.func) + ' -n ' + str(val.nu) +'\n'
 		udf_in =  os.path.join(val.calc_dir, uin)
-		# shutil.copy(val.base_udf, udf_in)
 		mod_udf(udf_in, rate)
 	# バッチファイルを作成
 	f_batch = os.path.join(val.calc_dir, '_deform.bat')
