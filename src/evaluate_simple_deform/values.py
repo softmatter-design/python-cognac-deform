@@ -1,5 +1,5 @@
 # Values used for calculation
-def_mode = ''
+simple_def_mode = ''
 func = 4
 nu = 0.1
 sorted_udf = []

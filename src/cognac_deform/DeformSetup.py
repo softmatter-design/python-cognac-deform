@@ -5,19 +5,17 @@ from UDFManager import *
 
 import argparse
 import codecs
-import sys
 import os
-import shutil
 import platform
+import sys
 
 import cognac_deform.values as val
-
 ##### Main #####
 def deform():
 	# 各種条件を読み取り
 	read_all()
-	# ファイル名を設定し、バッチファイルを作成
-	make_batch()
+	# 
+	setup()
 	return
 
 ###################################
@@ -34,10 +32,10 @@ def read_arg():
 	args = parser.parse_args()
 	if args.udf:
 		if len(args.udf.split('.')) != 2 or args.udf.split('.')[1] != 'udf':
-			print('the file name you selected is not udf file !')
+			print('\nthe file name you selected is not udf file !')
 			sys.exit('select proper udf file to read.')
 		elif not os.access(args.udf, os.R_OK):
-			sys.exit(args.udf, 'seems not exist !')
+			sys.exit('\nSelected udf of ', args.udf, ' seems not exist !\nbye now!!')
 		else:
 			val.read_udf = args.udf
 			# print('Selected udf file is ' + val.read_udf)
@@ -49,8 +47,7 @@ def read_arg():
 # 計算対象の条件を読み取る
 def read_nw_cond():
 	if not os.access('target_condition.udf', os.R_OK):
-		print("'target_condition.udf' is not exists.")
-		exit(1)
+		sys.exit("\n'target_condition.udf' is not exists.")
 	else:
 		cond_u = UDFManager('target_condition.udf')
 		val.func = cond_u.get('TargetCond.NetWork.N_Strands')
@@ -59,42 +56,114 @@ def read_nw_cond():
 
 # シミュレーション条件を設定する。
 def read_sim_cond():
-	#
 	if not os.path.isfile('../deform_condition.udf'):
-		print()
-		print('In the parent directory, no "deform_condition.udf" is found !')
+		print('\nIn the parent directory, no "deform_condition.udf" is found !')
 		print('New one will be generated.')
 		print('Please, modify and save it !\n')
-		makenewudf()
+		make_newudf()
 		input('Press ENTER to continue...')
 	else:
-		read_and_set_condition()
+		read_and_set()
 	return
 
 # make new udf when not found.
-def makenewudf():
+def make_newudf():
 	contents = '''
 	\\begin{def}
 	CalcConditions:{
 		Cognac_ver:select{"cognac112"} "使用する Cognac のバージョン",
 		Cores: int "計算に使用するコア数を指定"
 		} "Cognac による計算の条件を設定"
-	SimulationConditions:{
-		DeformMode:select{"Elong", "Shear"} "変形モードを選択",
-		DeformRate[]:float "これらは変形レートのリスト",
-		MaxDeformation:float "最大ひずみ",
-		Resolution:float "これは１ステップ計算での伸長度　Res = lambda/1_step"
+	SimpleDeformation:{
+		DeformMode:select{"none", "Stretch", "Shear", "both"} "変形モードを選択",
+			Stretch:{
+				DeformRate[]:float "これらは変形レートのリスト",
+				MaxDeformation:float "最大ひずみ",
+				Resolution:float "これは１ステップ計算での伸長度　Res = lambda/1_step"
+				}
+			Shear:{
+				DeformRate[]:float "これらは変形レートのリスト",
+				MaxDeformation:float "最大ひずみ",
+				Resolution:float "これは１ステップ計算での伸長度　Res = lambda/1_step"
+				}
+			both:{
+				DeformRate[]:float "これらは変形レートのリスト",
+				MaxDeformation:float "最大ひずみ",
+				Resolution:float "これは１ステップ計算での伸長度　Res = lambda/1_step"
+				}
+		} "計算ターゲットの条件を設定"		
+	CycleDeformation:{
+		CyclicDeform:select{"none", "CyclicStretch", "CyclicShear"} "変形モードを選択",
+		CyclicStretch:{
+			StretchConditions[]:{
+				MaxDeformation:float "最大ひずみ",
+				Repeat:int "サイクルの繰り返し数",
+				DeformRate[]:float "これらは変形レートのリスト",
+				Resolution:float "これは１ステップ計算での伸長度　Res = lambda/1_step"
+				}
+			}
+		CyclicShear:{
+			ShearConditions[]:{
+				MaxDeformation:float "最大ひずみ",
+				Repeat:int "サイクルの繰り返し数",
+				DeformRate[]:float "これらは変形レートのリスト",
+				Resolution:float "これは１ステップ計算での伸長度　Res = lambda/1_step"
+				}
+			}
 		} "計算ターゲットの条件を設定"
 	\end{def}	
 
 	\\begin{data}
 	CalcConditions:{"cognac112",1}
-	SimulationConditions:{
-	"Elong",
-	[1.0e-03,5.0e-03,1.0e-03,5.0e-04,1.0e-04,5.0e-05]
-	3.0,
-	1.0e-02
-	}
+	SimpleDeformation:{
+		"both",
+			{
+			[1.0e-03,5.0e-4,1.0e-04,5.0e-05]
+			3.00,
+			1.0e-02
+			}
+			{
+			[1.0e-03,5.0e-4,1.0e-04,5.0e-05]
+			2.0,
+			1.0e-02
+			}
+			{
+			[1.0e-03,5.0e-4,1.0e-04,5.0e-05]
+			3.00,
+			1.0e-02
+			}
+		}
+	CycleDeformation:{
+		"CyclicShear",
+			{
+				[
+					{2.0000000,
+					3,
+					[1.0000000e-03,1.0000000e-04]
+					1.0000000e-02
+					}
+					{3.0000000,
+					3,
+					[1.0000000e-03,1.0000000e-04,1.0000000e-05]
+					1.0000000e-02
+					}
+				]
+			}
+			{
+				[
+					{2.0000000,
+					3,
+					[1.0000000e-03,1.0000000e-04]
+					1.0000000e-02
+					}
+					{3.0000000,
+					3,
+					[1.0000000e-03,1.0000000e-04,1.0000000e-05]
+					1.0000000e-02
+					}
+				]
+			}
+		}
 	\end{data}
 	'''
 	###
@@ -103,11 +172,11 @@ def makenewudf():
 	return
 
 # Read udf and setup initial conditions
-def read_and_set_condition():
+def read_and_set():
 	dic={'y':True,'yes':True,'q':False,'quit':False}
 	while True:
 		# read udf
-		read_conditionudf()
+		read_condition()
 		# select
 		init_calc()
 		print('Change UDF: type [r]eload')
@@ -118,79 +187,133 @@ def read_and_set_condition():
 			break
 		print('##### \nRead Condition UDF again \n#####\n\n')
 	if inp:
-		print("\n\nSetting UP progress !!")
-		# 計算用のディレクトリーを作成
-		make_dir()
-		# 
-		set_base()
 		return
 	else:
 		sys.exit("##### \nQuit !!")
 
 # Read condition udf
-def read_conditionudf():
+def read_condition():
 	u = UDFManager('../deform_condition.udf')
 	u.jump(-1)
 	# 使用するCognacのバージョン
 	val.ver_Cognac = u.get('CalcConditions.Cognac_ver')
 	# 計算に使用するコア数
 	val.core = u.get('CalcConditions.Cores')
-	## 計算ターゲット
-	val.def_mode  = u.get('SimulationConditions.DeformMode')
-	val.rate_list = u.get('SimulationConditions.DeformRate[]')
-	val.deform_max = u.get('SimulationConditions.MaxDeformation')
-	val.resolution = u.get('SimulationConditions.Resolution')
-	#
-	val.calc_dir = val.def_mode + '_calculation_read_' + val.read_udf.split('.')[0]
+	# Simple Deformation
+	val.simple_def_mode  = u.get('SimpleDeformation.DeformMode')
+	if val.simple_def_mode == 'Stretch':
+		val.sim_rate_list = u.get('SimpleDeformation.Stretch.DeformRate[]')
+		val.sim_deform_max = u.get('SimpleDeformation.Stretch.MaxDeformation')
+		val.sim_resolution = u.get('SimpleDeformation.Stretch.Resolution')
+		val.sim_deform = val.simple_def_mode
+	elif val.simple_def_mode == 'Shear':
+		val.sim_rate_list = u.get('SimpleDeformation.Shear.DeformRate[]')
+		val.sim_deform_max = u.get('SimpleDeformation.Shear.MaxDeformation')
+		val.sim_resolution = u.get('SimpleDeformation.Shear.Resolution')
+		val.sim_deform = val.simple_def_mode
+	elif val.simple_def_mode == 'both':
+		val.sim_rate_list = u.get('SimpleDeformation.both.DeformRate[]')
+		val.sim_deform_max = u.get('SimpleDeformation.both.MaxDeformation')
+		val.sim_resolution = u.get('SimpleDeformation.both.Resolution')
+	# Cyclic Deformation
+	val.cyclic_deform = u.get('CycleDeformation.CyclicDeform')
+	if val.cyclic_deform == 'CyclicStretch':
+		tmp = u.get('CycleDeformation.CyclicStretch.StretchConditions[]')
+	elif val.cyclic_deform == 'CyclicShear':
+		tmp = u.get('CycleDeformation.CyclicShear.ShearConditions[]')
+	for data in tmp:
+		val.cyc_deform_max.append(data[0])
+		val.cyc_repeat.append(data[1])
+		val.cyc_ratelist.append(data[2])
+		val.cyc_resolution.append(data[3])
+	
+	if val.simple_def_mode == 'none' and val.cyclic_deform == 'none':
+		sys.exit('No proper condition is selected.\nBye!')
 	return
-
 # 
 def init_calc():
 	text = "################################################" + "\n"
 	text += "Cores used for simulation\t\t" + str(val.core ) + "\n"
 	text += "################################################" + "\n"
-	text += "Deform mode:\t\t\t\t" + str(val.def_mode) + "\n"
-	text += "Deform Rate:\t" + ', '.join(["{0:4.0e}".format(x) for x in val.rate_list]) + "\n"
-	text += "Maximum Strain:\t\t\t\t" + str(val.deform_max) + "\n"
-	text += "Resolution:\t\t\t\t" + str(round(val.resolution,4)) + "\n"
-	text += "################################################" + "\n"
+	if val.simple_def_mode != 'none':
+		text += "Deform mode:\t\t\t\t" + str(val.simple_def_mode) + "\n"
+		text += "Deform Rate:\t\t" + ', '.join(["{0:4.0e}".format(x) for x in val.sim_rate_list]) + "\n"
+		text += "Maximum Strain:\t\t\t\t" + str(val.sim_deform_max) + "\n"
+		text += "Resolution:\t\t\t\t" + str(round(val.sim_resolution,4)) + "\n"
+		text += "################################################" + "\n"
+	if val.cyclic_deform != 'none':
+		text += "Deform mode:\t\t\t" + str(val.cyclic_deform) + "\n"
+		for i in range(len(val.cyc_deform_max)):
+			text += 'Cyclic condition #' + str(i) + '\n'
+			text += "\tMaximum Strain:\t\t\t" + str(val.cyc_deform_max[i]) + "\n"
+			text += "\tRepeat:\t\t\t\t" + str(val.cyc_repeat[i]) + "\n"
+			text += "\tCyclic Deform Rate:\t" + ', '.join(["{0:4.0e}".format(x) for x in val.cyc_ratelist[i]]) + "\n"
+			text += "\tResolution:\t\t\t" + str(round(val.cyc_resolution[i], 4)) + "\n"
+		text += "################################################" + "\n"
 	print(text)
 	return
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+#######################################
+#
+def setup():
+	print("\n\nSetting UP progress !!")
+	if val.simple_def_mode == 'both':
+		for val.sim_deform in ['Shear', 'Stretch']:
+			# 計算用のディレクトリーを作成
+			set_dir()
+			# ファイル名を設定し、バッチファイルを作成
+			make_batch()
+	else:
+		# 計算用のディレクトリーを作成
+		make_dir()
+		# ファイル名を設定し、バッチファイルを作成
+		make_batch()
+	return
+
 # 
-def make_dir():
+def set_dir():
+	val.calc_dir = val.sim_deform + '_calculation_read_' + val.read_udf.split('.')[0]
 	if os.path.exists(val.calc_dir):
 		print("Use existing dir of ", val.calc_dir)
 	else:
 		print("Make new dir of ", val.calc_dir)
 		os.makedirs(val.calc_dir)
-	return
-
-def set_base():
+	#
 	val.base_udf = os.path.join(val.calc_dir, 'base.udf')
-	print("Readin file = ", val.read_udf)
 	u = UDFManager(val.read_udf)
 	u.jump(1)
 	u.eraseRecord(record_pos=-999,record_num=-999)
 	u.write(val.base_udf)
 	return
 
-#######################################
 # ファイル名を設定し、バッチファイルを作成
 def make_batch():
 	val.batch = "#!/bin/bash\n"
 	#
-	for rate in val.rate_list:
+	for rate in val.sim_rate_list:
 		# UDFファイル名を設定
 		rate_str = "{0:4.0e}".format(rate)
-		if val.def_mode == 'Elong':
+		if val.sim_deform == 'Stretch':
 			uin = 'Elong_rate_' + rate_str + "_uin.udf"
-		elif val.def_mode == 'Shear':
+		elif val.sim_deform == 'Shear':
 			uin = 'Shear_rate_' + rate_str + "_uin.udf"
 		# 
 		make_title("Calculating rate_" + rate_str)
 		val.batch += val.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(val.core) +' \n'
-		val.batch += 'evaluate_simpledeform -f ' + str(val.func) + ' -n ' + str(val.nu) +'\n'
+		val.batch += 'evaluate_simple_deform -f ' + str(val.func) + ' -n ' + str(val.nu) +'\n'
 		udf_in =  os.path.join(val.calc_dir, uin)
 		mod_udf(udf_in, rate)
 	# バッチファイルを作成
@@ -201,7 +324,6 @@ def make_batch():
 		os.chmod(f_batch, 0o777)
 	return
 
-###########################
 # ターミナルのタイトルを設定
 def make_title(title):
 	if platform.system() == "Windows":
@@ -212,13 +334,13 @@ def make_title(title):
 
 #-----
 def mod_udf(udf_in, rate):
-	if val.def_mode == 'Elong':
-		deform_time = (val.deform_max - 1)/rate
-	elif val.def_mode == 'Shear':
-		deform_time = val.deform_max/rate
+	if val.sim_deform == 'Stretch':
+		deform_time = (val.sim_deform_max - 1)/rate
+	elif val.sim_deform == 'Shear':
+		deform_time = val.sim_deform_max/rate
 	#
-	time_total = round(deform_time/val.time_div)
-	time_1_step = round(val.resolution/val.time_div/rate)
+	time_total = round(deform_time/val.sim_time_div)
+	time_1_step = round(val.sim_resolution/val.sim_time_div/rate)
 	#
 	u = UDFManager(val.base_udf)
 	# goto global data
@@ -227,7 +349,7 @@ def mod_udf(udf_in, rate):
 	# Dynamics_Conditions
 	p = 'Simulation_Conditions.Dynamics_Conditions.'
 	u.put(100000.,		p + 'Max_Force')
-	u.put(val.time_div,	p + 'Time.delta_T')
+	u.put(val.sim_time_div,	p + 'Time.delta_T')
 	u.put(time_total,	p + 'Time.Total_Steps')
 	u.put(time_1_step,	p + 'Time.Output_Interval_Steps')
 	u.put(1.0,			p + 'Temperature.Temperature')
@@ -235,7 +357,7 @@ def mod_udf(udf_in, rate):
 	u.put(0,			p + 'Pressure_Stress.Pressure')
 
 	# Deformation
-	if val.def_mode == 'Elong':
+	if val.sim_deform == 'Stretch':
 		p = "Simulation_Conditions.Dynamics_Conditions.Deformation."
 		u.put('Cell_Deformation', 		p + 'Method')
 		u.put('Simple_Elongation', 		p + 'Cell_Deformation.Method')
@@ -245,7 +367,7 @@ def mod_udf(udf_in, rate):
 		u.put('z', 						p + 'Cell_Deformation.Simple_Elongation.Axis')
 		u.put(1, 						p + 'Cell_Deformation.Interval_of_Deform')
 		u.put(0, 						p + 'Cell_Deformation.Deform_Atom')
-	elif val.def_mode == 'Shear':
+	elif val.sim_deform == 'Shear':
 		p = "Simulation_Conditions.Dynamics_Conditions.Deformation."
 		u.put('Lees_Edwards', 	p + 'Method')
 		u.put('Steady', 		p + 'Lees_Edwards.Method')
