@@ -8,6 +8,8 @@ core = 1
 read_udf = ''
 base_udf = ''
 
+system_size = 0.
+
 ##### Conditions #####
 # 変形モード
 simple_def_mode = ''
@@ -24,9 +26,15 @@ cyc_repeat = []
 cyc_ratelist = []
 cyc_resolution = []
 
+cyc_dir = ''
+cyc_readudf = ''
+cyc_direction = ''
+cyc_dirlist = []
 
-
-
+cyc_def_max = 0
+cyc_rate = 0
+cyc_count = 0
+cyc_resol = 0
 
 func = 4
 nu = 0.1

@@ -19,7 +19,8 @@ setup(
     entry_points={
         "console_scripts": [
           'deform_setup = cognac_deform.deform_setup:main',
-          'evaluate_simple_deform = evaluate_simple_deform.eval_sim_def:main'
+          'evaluate_simple_deform = evaluate_simple_deform.eval_sim_def:main',
+          'evaluate_cyclic_deform = evaluate_simple_deform.eval_cyc_def:main'
         ]
     }
 )

@@ -216,6 +216,11 @@ def read_condition():
 		val.sim_deform_max = u.get('SimpleDeformation.both.MaxDeformation')
 		val.sim_resolution = u.get('SimpleDeformation.both.Resolution')
 	# Cyclic Deformation
+	tmp = []
+	val.cyc_deform_max = []
+	val.cyc_repeat = []
+	val.cyc_ratelist = []
+	val.cyc_resolution = []
 	val.cyclic_deform = u.get('CycleDeformation.CyclicDeform')
 	if val.cyclic_deform == 'CyclicStretch':
 		tmp = u.get('CycleDeformation.CyclicStretch.StretchConditions[]')
@@ -226,7 +231,6 @@ def read_condition():
 		val.cyc_repeat.append(data[1])
 		val.cyc_ratelist.append(data[2])
 		val.cyc_resolution.append(data[3])
-	
 	if val.simple_def_mode == 'none' and val.cyclic_deform == 'none':
 		sys.exit('No proper condition is selected.\nBye!')
 	return
@@ -269,7 +273,16 @@ def init_calc():
 #######################################
 #
 def setup():
-	print("\n\nSetting UP progress !!")
+	print("\n\nSetting UP progress !!\n")
+	if val.simple_def_mode != 'none':
+		setup_simple_deform()
+	elif val.cyclic_deform != 'none':
+		setup_cyclic()
+	return
+
+#####
+#
+def setup_simple_deform():
 	if val.simple_def_mode == 'both':
 		for val.sim_deform in ['Shear', 'Stretch']:
 			# 計算用のディレクトリーを作成
@@ -278,11 +291,10 @@ def setup():
 			make_batch()
 	else:
 		# 計算用のディレクトリーを作成
-		make_dir()
+		set_dir()
 		# ファイル名を設定し、バッチファイルを作成
 		make_batch()
 	return
-
 # 
 def set_dir():
 	val.calc_dir = val.sim_deform + '_calculation_read_' + val.read_udf.split('.')[0]
@@ -307,7 +319,7 @@ def make_batch():
 		# UDFファイル名を設定
 		rate_str = "{0:4.0e}".format(rate)
 		if val.sim_deform == 'Stretch':
-			uin = 'Elong_rate_' + rate_str + "_uin.udf"
+			uin = 'Stretch_rate_' + rate_str + "_uin.udf"
 		elif val.sim_deform == 'Shear':
 			uin = 'Shear_rate_' + rate_str + "_uin.udf"
 		# 
@@ -392,3 +404,176 @@ def mod_udf(udf_in, rate):
 	u.write(udf_in)
 	return
 
+
+
+
+
+
+
+
+
+#######
+#
+def setup_cyclic():
+	val.batch = "#!/bin/bash\n"
+	val.cyc_dir = val.cyclic_deform + '_read_' + val.read_udf.split('.')[0]
+	if os.path.exists(val.cyc_dir):
+		print("Use existing dir of ", val.cyc_dir)
+	else:
+		print("Make new dir of ", val.cyc_dir)
+		os.makedirs(val.cyc_dir)
+	#
+	for id, val.cyc_def_max in enumerate(val.cyc_deform_max):
+		for val.cyc_rate in val.cyc_ratelist[id]:
+			set_cyclic_dir()
+			make_cycle_batch(id)
+			# バッチファイルを作成
+			f_batch = os.path.join(val.calc_dir, '_deform.bat')
+			with open(f_batch, 'w') as f:
+				f.write(val.batch)
+			if platform.system() == "Linux":
+				os.chmod(f_batch, 0o777)
+	batch_series()
+	return
+
+# 
+def set_cyclic_dir():
+	tmp_dir = 'Deform_until_' + str(val.cyc_def_max).replace('.', '_') + "_rate_" + "{0:4.0e}".format(val.cyc_rate)
+	val.cyc_dirlist.append(tmp_dir)
+	val.calc_dir = os.path.join(val.cyc_dir, tmp_dir)
+	if os.path.exists(val.calc_dir):
+		print("Use existing dir of ", val.calc_dir)
+	else:
+		print("Make new dir of ", val.calc_dir)
+		os.makedirs(val.calc_dir)
+	#
+	val.base_udf = os.path.join(val.calc_dir, 'base.udf')
+	u = UDFManager(val.read_udf)
+	u.jump(1)
+	val.system_size = float(u.get('Structure.Unit_Cell.Cell_Size.c'))
+	u.eraseRecord(record_pos=-999,record_num=-999)
+	u.write(val.base_udf)
+	val.cyc_readudf = 'base.udf'
+	return
+
+# ファイル名を設定し、バッチファイルを作成
+def make_cycle_batch(id):
+	for val.cyc_count in range(val.cyc_repeat[id]):
+		val.cyc_resol = val.cyc_resolution[id]
+		make_cycle()
+
+		val.batch += 'evaluate_cyclic_deform -f ' + str(val.func) + ' -n ' + str(val.nu) +'\n'	
+	return
+
+#
+def make_cycle():
+	for val.cyc_direction in ['_Forward', '_Backward']:
+		make_title("Calculating_Cycle_until_" + str(val.cyc_def_max).replace('.', '_') + "_rate_" + "{0:4.0e}".format(val.cyc_rate)) + '_' + str(val.cyc_count)
+		# UDFファイル名を設定
+		uin = '#' +str(val.cyc_count) + val.cyc_direction + "_uin.udf"
+		uout = uin.replace("uin", "out")
+		val.batch += val.ver_Cognac + ' -I ' + uin + ' -O ' + uout + ' -n ' + str(val.core) +' \n'
+		
+		udf_in =  os.path.join(val.calc_dir, uin)
+		mod_udf(udf_in)
+		val.cyc_readudf = uout
+
+	return
+
+# ターミナルのタイトルを設定
+def make_title(title):
+	if platform.system() == "Windows":
+		val.batch += "title " + title + "\n"
+	elif platform.system() == "Linux":
+		val.batch += r'echo -ne "\033]0; ' + title + ' \007"' + '\n'
+	return
+
+#-----
+def mod_udf(udf_in):
+	if val.cyclic_deform == 'CyclicStretch':
+		deform_time = (def_max - 1)/rate
+		speed = rate*val.system_size
+	elif val.cyclic_deform == 'CyclicShear':
+		deform_time = val.cyc_def_max/val.cyc_rate
+	#
+	time_total = round(deform_time/val.sim_time_div)
+	time_1_step = round(resolution/val.sim_time_div/val.cyc_rate)
+	#
+	u = UDFManager(val.base_udf)
+	# goto global data
+	u.jump(-1)
+
+	# Dynamics_Conditions
+	p = 'Simulation_Conditions.Dynamics_Conditions.'
+	u.put(100000.,		p + 'Max_Force')
+	u.put(val.sim_time_div,	p + 'Time.delta_T')
+	u.put(time_total,	p + 'Time.Total_Steps')
+	u.put(time_1_step,	p + 'Time.Output_Interval_Steps')
+	u.put(1.0,			p + 'Temperature.Temperature')
+	u.put(0, 			p + 'Temperature.Interval_of_Scale_Temp')
+	u.put(0,			p + 'Pressure_Stress.Pressure')
+
+	# Deformation
+	if val.cyclic_deform == 'CyclicStretch':
+		p = "Simulation_Conditions.Dynamics_Conditions.Deformation."
+		u.put('Cell_Deformation', 	p + 'Method')
+		u.put('Simple_Elongation', 	p + 'Cell_Deformation.Method')
+		u.put('Deformation_Speed', 	p + 'Cell_Deformation.Simple_Elongation.Input_Method')
+		if val.cyc_direction == '_Forward':
+			u.put(speed, p + 'Cell_Deformation.Simple_Elongation.Deformation_Speed.Speed')
+		else:
+			u.put(-1.*speed, p + 'Cell_Deformation.Simple_Elongation.Deformation_Speed.Speed')
+		u.put(0.5, 						p + 'Cell_Deformation.Simple_Elongation.Poisson_Ratio')
+		u.put('z', 						p + 'Cell_Deformation.Simple_Elongation.Axis')
+		u.put(1, 						p + 'Cell_Deformation.Interval_of_Deform')
+		u.put(0, 						p + 'Cell_Deformation.Deform_Atom')
+	elif val.cyclic_deform == 'CyclicShear':
+		p = "Simulation_Conditions.Dynamics_Conditions.Deformation."
+		u.put('Lees_Edwards', 	p + 'Method')
+		u.put('Steady', 		p + 'Lees_Edwards.Method')
+		if val.cyc_direction == '_Forward':
+			u.put(rate, 		p + 'Lees_Edwards.Steady.Shear_Rate')
+		else:
+			u.put(-1.*rate, 	p + 'Lees_Edwards.Steady.Shear_Rate')
+	
+	# Output_Flags
+	u.put([1, 1, 1], 'Simulation_Conditions.Output_Flags.Structure')
+
+	# Read_Set_of_Molecules
+	p = 'Initial_Structure.Read_Set_of_Molecules'
+	u.put(['', -1], p)
+
+	# Generate_Method
+	p = 'Initial_Structure.Generate_Method.'
+	u.put('Restart', 		p + 'Method')
+	u.put([val.cyc_readudf, -1, 1, 1], 	p + 'Restart')
+
+	# Relaxation
+	p = 'Initial_Structure.Relaxation.'
+	u.put(0, p + 'Relaxation')
+	#--- Write UDF ---
+	u.write(udf_in)
+	return
+
+
+#######################################################################
+# ファイル名を設定し、バッチファイルを作成
+def batch_series():
+	batch_series = ''
+	for subdir in val.cyc_dirlist:
+		if platform.system() == "Windows":
+			batch_series += 'cd /d %~dp0\\' + subdir +'\n'
+			batch_series += 'call _deform.bat\n'
+		elif platform.system() == "Linux":
+			batch_series += 'cd ./' + subdir +'\n'
+			batch_series += './_deform.bat\n'
+			batch_series += 'cd ../\n'
+	if platform.system() == "Windows":
+		batch_series += 'cd /d %~dp0\n'
+
+	f_batch = os.path.join(val.cyc_dir, '_calc_all.bat')
+	with open(f_batch, 'w') as f:
+		f.write(batch_series)
+		if platform.system() == "Linux":
+			os.chmod(f_batch, 0o777)
+	return
