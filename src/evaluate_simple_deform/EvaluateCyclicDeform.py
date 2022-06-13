@@ -15,11 +15,10 @@ import evaluate_simple_deform.values as val
 # print("This is module!")
 ###########################################################
 def cyclic_deform():
-	print('OK')
-	# setup()
-	# calc_stress_all()
-	# save_data()
-	# plot()
+	setup()
+	calc_stress_all()
+	save_data()
+	plot()
 	return
 
 ##############
@@ -33,36 +32,34 @@ def read_arg():
 	parser.add_argument('-f','--func', type=int, help="Functionality of junction point (int).")
 	parser.add_argument('-n', '--nu', type=float, help="Strand density of network (float).")
 	parser.add_argument('-m', '--mode', help="Mode of deformation; Shear or Stretch")
+	parser.add_argument('-d', '--deform', help="Maximum value of deformation")
 	args = parser.parse_args()
 	if args.func and args.nu:
 		val.func = args.func
 		val.nu = args.nu
+		val.cyc_deform_max = args.deform
 	else:
 		print('\n#####\nfunctionality and/or nu is not specified')
 		print('Default value will be used!')
 	if args.mode:
-		val.simple_def_mode = args.mode
+		val.cyc_def_mode = args.mode
 	else:
 		print('\n#####\ndeformation mode is not set!')
-		print('according to file name(Shear or Stretch), evaluation mode  will be set!')
+		sys.exit('either mode of shear or stretch should be set!')
+	if args.deform:
+		val.cyc_deform_max = args.deform
+	else:
+		print('\n#####\nMax deformation is not set !')
+		sys.exit('this value should be set!')
 	return
 # File Select
 def file_listing():
 	target = '*_out.udf'
 	udf_list = glob.glob(target)
 	if udf_list:
-		if udf_list[0].split('_')[0] in ['Shear', 'Stretch']:
-			val.simple_def_mode = udf_list[0].split('_')[0]
-		else:
-			print('\n#####\nfile name is not start from either Shear or Stretch.\ndefault mode of Stretch will be used!')
-			val.simple_def_mode = 'Stretch'
+		val.sorted_udf = sorted(udf_list, reverse=True)
 	else:
 		sys.exit('\n#####\nNo effective *_out.udf file in this directory !!\nSomething wrong !!\n')
-	if udf_list[0].split('_')[2][1] == 'e':
-		tmp = sorted([[i, float(i.split('_')[2])] for i in udf_list], key= itemgetter(1), reverse=True)
-		val.sorted_udf = list(np.array(tmp)[:,0])
-	else:
-		val.sorted_udf = sorted(udf_list, reverse=True)
 	return 
 
 ############################
@@ -86,10 +83,10 @@ def read_and_calc(target):
 	for i in range(1, uobj.totalRecord()):
 		print("Reading Rec.=", i)
 		uobj.jump(i)
-		if val.simple_def_mode == 'Shear':
+		if val.simple_def_mode == 'shear':
 			stress = uobj.get('Statistics_Data.Stress.Total.Batch_Average.xy')
 			strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
-		elif val.simple_def_mode == 'Stretch':
+		elif val.simple_def_mode == 'stretch':
 			cell = uobj.get("Structure.Unit_Cell.Cell_Size")
 			stress_list = uobj.get("Statistics_Data.Stress.Total.Batch_Average")
 			stress = (cell[0]*cell[1])*(stress_list[2]-(stress_list[0] + stress_list[1])/2.)/area_init

@@ -7,3 +7,7 @@ ss_data = []
 ss_data_list = []
 plt_file = 'plot_SS_multi.plt'
 script = ''
+
+# values for cyclic
+cyc_def_mode = ''
+cyc_deform_max = 0.

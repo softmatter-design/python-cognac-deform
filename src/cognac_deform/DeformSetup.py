@@ -461,14 +461,16 @@ def make_cycle_batch(id):
 	for val.cyc_count in range(val.cyc_repeat[id]):
 		val.cyc_resol = val.cyc_resolution[id]
 		make_cycle()
-
-		val.batch += 'evaluate_cyclic_deform -f ' + str(val.func) + ' -n ' + str(val.nu) +'\n'	
+		if val.cyclic_deform == 'CyclicStretch':
+			val.batch += 'evaluate_cyclic_deform -f ' + str(val.func) + ' -n ' + str(val.nu) + '-m stretch ' + '-d ' + str(val.cyc_def_max) + '\n'
+		elif val.cyclic_deform == 'CyclicShear':
+			val.batch += 'evaluate_cyclic_deform -f ' + str(val.func) + ' -n ' + str(val.nu) + '-m shear ' + '-d ' + str(val.cyc_def_max) + '\n'
 	return
 
 #
 def make_cycle():
 	for val.cyc_direction in ['_Forward', '_Backward']:
-		make_title("Calculating_Cycle_until_" + str(val.cyc_def_max).replace('.', '_') + "_rate_" + "{0:4.0e}".format(val.cyc_rate)) + '_' + str(val.cyc_count)
+		make_title("Calculating_Cycle_until_" + str(val.cyc_def_max).replace('.', '_') + "_rate_" + "{0:4.0e}".format(val.cyc_rate) + '_#' + str(val.cyc_count) + val.cyc_direction)
 		# UDFファイル名を設定
 		uin = '#' +str(val.cyc_count) + val.cyc_direction + "_uin.udf"
 		uout = uin.replace("uin", "out")
@@ -497,7 +499,7 @@ def mod_udf(udf_in):
 		deform_time = val.cyc_def_max/val.cyc_rate
 	#
 	time_total = round(deform_time/val.sim_time_div)
-	time_1_step = round(resolution/val.sim_time_div/val.cyc_rate)
+	time_1_step = round(val.cyc_resol/val.sim_time_div/val.cyc_rate)
 	#
 	u = UDFManager(val.base_udf)
 	# goto global data
@@ -532,9 +534,9 @@ def mod_udf(udf_in):
 		u.put('Lees_Edwards', 	p + 'Method')
 		u.put('Steady', 		p + 'Lees_Edwards.Method')
 		if val.cyc_direction == '_Forward':
-			u.put(rate, 		p + 'Lees_Edwards.Steady.Shear_Rate')
+			u.put(val.cyc_rate, 		p + 'Lees_Edwards.Steady.Shear_Rate')
 		else:
-			u.put(-1.*rate, 	p + 'Lees_Edwards.Steady.Shear_Rate')
+			u.put(-1.*val.cyc_rate, 	p + 'Lees_Edwards.Steady.Shear_Rate')
 	
 	# Output_Flags
 	u.put([1, 1, 1], 'Simulation_Conditions.Output_Flags.Structure')
