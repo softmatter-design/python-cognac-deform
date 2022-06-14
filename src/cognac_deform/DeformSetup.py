@@ -415,7 +415,6 @@ def mod_udf(udf_in, rate):
 #######
 #
 def setup_cyclic():
-	val.batch = "#!/bin/bash\n"
 	val.cyc_dir = val.cyclic_deform + '_read_' + val.read_udf.split('.')[0]
 	if os.path.exists(val.cyc_dir):
 		print("Use existing dir of ", val.cyc_dir)
@@ -425,6 +424,7 @@ def setup_cyclic():
 	#
 	for id, val.cyc_def_max in enumerate(val.cyc_deform_max):
 		for val.cyc_rate in val.cyc_ratelist[id]:
+			val.batch = "#!/bin/bash\n"
 			set_cyclic_dir()
 			make_cycle_batch(id)
 			# バッチファイルを作成
@@ -462,9 +462,9 @@ def make_cycle_batch(id):
 		val.cyc_resol = val.cyc_resolution[id]
 		make_cycle()
 		if val.cyclic_deform == 'CyclicStretch':
-			val.batch += 'evaluate_cyclic_deform -f ' + str(val.func) + ' -n ' + str(val.nu) + '-m stretch ' + '-d ' + str(val.cyc_def_max) + '\n'
+			val.batch += 'evaluate_cyclic_deform -f ' + str(val.func) + ' -n ' + str(val.nu) + ' -m stretch' + ' -d ' + str(val.cyc_def_max) + '\n'
 		elif val.cyclic_deform == 'CyclicShear':
-			val.batch += 'evaluate_cyclic_deform -f ' + str(val.func) + ' -n ' + str(val.nu) + '-m shear ' + '-d ' + str(val.cyc_def_max) + '\n'
+			val.batch += 'evaluate_cyclic_deform -f ' + str(val.func) + ' -n ' + str(val.nu) + ' -m shear' + ' -d ' + str(val.cyc_def_max) + '\n'
 	return
 
 #
@@ -493,8 +493,8 @@ def make_title(title):
 #-----
 def mod_udf(udf_in):
 	if val.cyclic_deform == 'CyclicStretch':
-		deform_time = (def_max - 1)/rate
-		speed = rate*val.system_size
+		deform_time = (val.cyc_def_max - 1)/val.cyc_rate
+		speed = val.cyc_rate*val.system_size
 	elif val.cyclic_deform == 'CyclicShear':
 		deform_time = val.cyc_def_max/val.cyc_rate
 	#

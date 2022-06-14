@@ -18,7 +18,7 @@ def cyclic_deform():
 	setup()
 	calc_stress_all()
 	save_data()
-	plot()
+	plot_ss()
 	return
 
 ##############
@@ -57,7 +57,9 @@ def file_listing():
 	target = '*_out.udf'
 	udf_list = glob.glob(target)
 	if udf_list:
-		val.sorted_udf = sorted(udf_list, reverse=True)
+		tmp = sorted(udf_list, reverse=True)
+		for i in range(int(len(tmp)/2)):
+			val.sorted_udf.append(tmp[-2*(i+1):len(tmp)-2*i])
 	else:
 		sys.exit('\n#####\nNo effective *_out.udf file in this directory !!\nSomething wrong !!\n')
 	return 
@@ -66,137 +68,92 @@ def file_listing():
 # Calculate stress either for Shear or Stretch deformation
 def calc_stress_all():
 	val.ss_data = []
-	for target in val.sorted_udf:
-		print("Readin file = ", target)
-		#
-		val.ss_data.append(read_and_calc(target))
+	for list in val.sorted_udf:
+		tmp_data = []
+		for target in list:
+			print("Readin file = ", target)
+			tmp_data.extend(read_and_calc(target))
+		val.ss_data.append(tmp_data)
 	return
 # Read Data
 def read_and_calc(target):
 	uobj = UDFManager(target)
 	data = []
 	#
-	uobj.jump(0)
-	cell = uobj.get("Structure.Unit_Cell.Cell_Size")
-	area_init = cell[0]*cell[1]
-	z_init = cell[2]
+	if target.split('_')[1] == 'Forward':
+		uobj.jump(0)
+		cell = uobj.get("Structure.Unit_Cell.Cell_Size")
+		area_init = cell[0]*cell[1]
+		z_init = cell[2]
+	else:
+		uobj.jump(1)
+		vol = uobj.get("Statistics_Data.Volume.Batch_Average")
+		area_init = vol**(2./3.)
+		z_init = vol**(1./3.)
 	for i in range(1, uobj.totalRecord()):
 		print("Reading Rec.=", i)
 		uobj.jump(i)
-		if val.simple_def_mode == 'shear':
+		if val.cyc_def_mode == 'shear':
 			stress = uobj.get('Statistics_Data.Stress.Total.Batch_Average.xy')
-			strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
-		elif val.simple_def_mode == 'stretch':
+			if target.split('_')[1] == 'Forward':
+				strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
+			else:
+				strain = float(val.cyc_deform_max) + float(uobj.get('Structure.Unit_Cell.Shear_Strain'))
+		elif val.cyc_def_mode == 'stretch':
 			cell = uobj.get("Structure.Unit_Cell.Cell_Size")
 			stress_list = uobj.get("Statistics_Data.Stress.Total.Batch_Average")
 			stress = (cell[0]*cell[1])*(stress_list[2]-(stress_list[0] + stress_list[1])/2.)/area_init
 			strain = uobj.get("Structure.Unit_Cell.Cell_Size.c")/z_init
-		data.append([strain, stress])
+		data.append([str(strain), stress])
 	return data
 
 ########################################
 # 計算結果をターゲットファイル名で保存
 def save_data():
-	for i, target_udf in enumerate(val.sorted_udf):
-		if (len(target_udf[0].split('_')) > 2) and (target_udf[0].split('_')[2][1] == 'e'):
-			target_rate = str(target_udf.split("_")[2])
-			target = "SS_rate_" + target_rate + '.dat'
-		else:
-			target = 'SS_' + target_udf.split('.')[0] + '.dat'
-		val.ss_data_list.append(target)
-		with open(target,'w') as f:
-			f.write('# Strain\tStress\n\n')
-			for line in val.ss_data[i]:
+	with open('SS.dat', 'w') as f:
+		f.write('# Strain\tStress\n\n')
+		for data in val.ss_data:
+			for line in data:
 				f.write(str(line[0]) + '\t' + str(line[1]) + '\n')
+			f.write('\n\n')
 	return
 
 ############################
 # 結果をプロット
-def plot():
-	plot_ss()
-	if val.simple_def_mode == 'Stretch':
-		plot_mr()
-	return
-
-# 必要なスクリプトを作成
 def plot_ss():
 	script_content()
-	with open(val.plt_file, 'w') as f:
+	with open('plot_ss.plt', 'w') as f:
 		f.write(val.script)
 	#
 	if platform.system() == "Windows":
-		subprocess.call([val.plt_file], shell=True)
+		subprocess.call(['plot_ss.plt'], shell=True)
 	elif platform.system() == "Linux":
-		subprocess.call(['gnuplot ' + val.plt_file], shell=True)
+		subprocess.call(['gnuplot ' + 'plot_ss.plt'], shell=True)
 	return
 
 # スクリプトの中身
 def script_content():
 	val.script = 'set term pngcairo font "Arial,14"\n\n'
 	val.script += '#set mono\nset colorsequence classic\n\n'
-	for i, filename in enumerate(val.ss_data_list):
-		val.script += 'data' + str(i) + ' = "' + filename + '"\n'
+	val.script += 'data = "SS.dat"\n'
 	val.script += 'set output "SS_multi.png"\n\n'
 	val.script += 'set key left\nset size square\n'
 	val.script += '#set xrange [1:3]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
 	val.script += 'set xlabel "Strain"\nset ylabel "Stress"\n\n'
 	val.script += 'G=' + str(val.nu) + '\nfunc=' + str(val.func) + '\n'
-	if val.simple_def_mode == 'Stretch':
+	if val.cyc_def_mode == 'stretch':
 		val.script += 'f(x,f)=f*G*(x-1./x**2.)\n'
 		val.script += '#f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
 		val.script += '#for shear uncomment and use 2nd eq\n'
-	elif val.simple_def_mode == 'Shear':
+	elif val.cyc_def_mode == 'shear':
 		val.script += 'f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
 	val.script += 'f1=(func-1.)/(func+1.)\nf2=1.-2./func\n\n'
-	val.script += 'plot	'
-	for i, target in enumerate(val.ss_data_list):
-		val.script += 'data' + str(i) + ' w l lw 2 lt ' + str(i+1) + ' ti "rate: ' + (target.split('.')[0]).split('_')[2] + '", \\\n'
+	val.script += 'plot '
+	for i in range(len(val.ss_data)):
+		val.script += 'data ind ' + str(i) + ' w l lw 2 lt ' + str(i+1) + ' ti "#' + str(i) + '", \\\n'
 	val.script += 'f(x,1) w l lw 2 lt 10 ti "Affin", \\\nf(x,f1) w l lw 2 lt 11 ti "Q. Pht.", \\\nf(x,f2) w l lw 2 lt 12 ti "Phantom"'
 	val.script += '\n\nreset'
 	return
-
-##############################
-# 
-def plot_mr():
-	for target in val.ss_data_list:
-		plt_file = 'plot_MR_' + target.split('.')[0] + '.plt'
-		make_mr_script(plt_file, target)
-		#
-		if platform.system() == "Windows":
-			subprocess.call([plt_file], shell=True)
-		elif platform.system() == "Linux":
-			subprocess.call(['gnuplot ' + plt_file], shell=True)
-	return
-
-# 必要なスクリプトを作成
-def make_mr_script(plt_file, target):
-	script = script_content2(target)
-	with open(plt_file, 'w') as f:
-		f.write(script)
-	return
-
-# スクリプトの中身
-def script_content2(target):
-	script = 'set term pngcairo font "Arial,14"\n\n'
-	script += '#set mono\nset colorsequence classic\n\n'
-	script += 'data = "' + target + '"\n'
-	script += 'set output "MR_' + target.split('.')[0] + '.png"\n\n'
-	script += 'set key left\nset size square\n'
-	script += '#set xrange [0:1]\n#set yrange [0.:0.1]\n#set xtics 0.5\n#set ytics 0.02\n'
-	script += 'set xlabel "1/{/Symbol l}"\nset ylabel "{/Symbol s}/({/Symbol l}-1/{/Symbol l}^2)"\n\n'
-	script += '## Fit Range\n\nlow = 0.3\nhigh = 0.6\n\n'
-	script += 'fit [low:high] a*x+b data usi ( 1/$1 ):( $2/( $1 - 1/( $1**2 ) ) ) via a,b\n\n'
-	script += 'set label 1 sprintf("C1 = %.3f", b/2) left at graph 0.2,0.8\n'
-	script += 'set label 2 sprintf("C2 = %.3f", a/2) left at graph 0.2,0.7\n'
-	script += 'set label 3 sprintf("fit range = %.3f to %.3f", low, high) left at graph 0.2,0.6\n\n#\n'
-	script += 'plot data usi ( 1/$1 ):( $2/( $1 - 1/( $1**2 ) ) ) w lp pt 7 lt 1 ti "Original Data", \\\n'
-	script += '[low:high] a*x + b w l lw 5 lt 2 ti "Fitted Line"'
-	script += '\n\nreset'
-
-	return script
-
-
-
 
 
 
