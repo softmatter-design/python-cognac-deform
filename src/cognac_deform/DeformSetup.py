@@ -462,9 +462,9 @@ def make_cycle_batch(id):
 		val.cyc_resol = val.cyc_resolution[id]
 		make_cycle()
 		if val.cyclic_deform == 'CyclicStretch':
-			val.batch += 'evaluate_cyclic_deform -f ' + str(val.func) + ' -n ' + str(val.nu) + ' -m stretch' + ' -d ' + str(val.cyc_def_max) + '\n'
+			val.batch += 'evaluate_cyclic_deform -f ' + str(val.func) + ' -n ' + str(val.nu) + ' -m stretch\n'
 		elif val.cyclic_deform == 'CyclicShear':
-			val.batch += 'evaluate_cyclic_deform -f ' + str(val.func) + ' -n ' + str(val.nu) + ' -m shear' + ' -d ' + str(val.cyc_def_max) + '\n'
+			val.batch += 'evaluate_cyclic_deform -f ' + str(val.func) + ' -n ' + str(val.nu) + ' -m shear\n'
 	return
 
 #
