@@ -200,13 +200,13 @@ def read_condition():
 	# 計算に使用するコア数
 	val.core = u.get('CalcConditions.Cores')
 	# Simple Deformation
-	val.simple_def_mode  = u.get('SimpleDeformation.DeformMode')
-	if val.simple_def_mode == 'Stretch':
+	val.simple_def_mode  = u.get('SimpleDeformation.DeformMode').lower()
+	if val.simple_def_mode == 'stretch':
 		val.sim_rate_list = u.get('SimpleDeformation.Stretch.DeformRate[]')
 		val.sim_deform_max = u.get('SimpleDeformation.Stretch.MaxDeformation')
 		val.sim_resolution = u.get('SimpleDeformation.Stretch.Resolution')
 		val.sim_deform = val.simple_def_mode
-	elif val.simple_def_mode == 'Shear':
+	elif val.simple_def_mode == 'shear':
 		val.sim_rate_list = u.get('SimpleDeformation.Shear.DeformRate[]')
 		val.sim_deform_max = u.get('SimpleDeformation.Shear.MaxDeformation')
 		val.sim_resolution = u.get('SimpleDeformation.Shear.Resolution')
@@ -284,7 +284,7 @@ def setup():
 #
 def setup_simple_deform():
 	if val.simple_def_mode == 'both':
-		for val.sim_deform in ['Shear', 'Stretch']:
+		for val.sim_deform in ['shear', 'stretch']:
 			# 計算用のディレクトリーを作成
 			set_dir()
 			# ファイル名を設定し、バッチファイルを作成
@@ -318,9 +318,9 @@ def make_batch():
 	for rate in val.sim_rate_list:
 		# UDFファイル名を設定
 		rate_str = "{0:4.0e}".format(rate)
-		if val.sim_deform == 'Stretch':
+		if val.sim_deform == 'stretch':
 			uin = 'Stretch_rate_' + rate_str + "_uin.udf"
-		elif val.sim_deform == 'Shear':
+		elif val.sim_deform == 'shear':
 			uin = 'Shear_rate_' + rate_str + "_uin.udf"
 		# 
 		make_title("Calculating rate_" + rate_str)
@@ -346,9 +346,9 @@ def make_title(title):
 
 #-----
 def mod_udf(udf_in, rate):
-	if val.sim_deform == 'Stretch':
+	if val.sim_deform == 'stretch':
 		deform_time = (val.sim_deform_max - 1)/rate
-	elif val.sim_deform == 'Shear':
+	elif val.sim_deform == 'shear':
 		deform_time = val.sim_deform_max/rate
 	#
 	time_total = round(deform_time/val.sim_time_div)
@@ -369,7 +369,7 @@ def mod_udf(udf_in, rate):
 	u.put(0,			p + 'Pressure_Stress.Pressure')
 
 	# Deformation
-	if val.sim_deform == 'Stretch':
+	if val.sim_deform == 'stretch':
 		p = "Simulation_Conditions.Dynamics_Conditions.Deformation."
 		u.put('Cell_Deformation', 		p + 'Method')
 		u.put('Simple_Elongation', 		p + 'Cell_Deformation.Method')
@@ -379,7 +379,7 @@ def mod_udf(udf_in, rate):
 		u.put('z', 						p + 'Cell_Deformation.Simple_Elongation.Axis')
 		u.put(1, 						p + 'Cell_Deformation.Interval_of_Deform')
 		u.put(0, 						p + 'Cell_Deformation.Deform_Atom')
-	elif val.sim_deform == 'Shear':
+	elif val.sim_deform == 'shear':
 		p = "Simulation_Conditions.Dynamics_Conditions.Deformation."
 		u.put('Lees_Edwards', 	p + 'Method')
 		u.put('Steady', 		p + 'Lees_Edwards.Method')

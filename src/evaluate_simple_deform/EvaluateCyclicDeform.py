@@ -26,32 +26,34 @@ def setup():
 	read_arg()
 	file_listing()
 	return
+
 # Read argument 
 def read_arg():
 	parser = argparse.ArgumentParser(description='Evaluate deformed simulations !')
 	parser.add_argument('-f','--func', type=int, help="Functionality of junction point (int).")
 	parser.add_argument('-n', '--nu', type=float, help="Strand density of network (float).")
-	parser.add_argument('-m', '--mode', help="Mode of deformation; Shear or Stretch")
-	parser.add_argument('-d', '--deform', help="Maximum value of deformation")
+	parser.add_argument('-m', '--mode', help="Mode of deformation; shear or stretch")
+	# parser.add_argument('-d', '--deform', help="Maximum value of deformation")
 	args = parser.parse_args()
 	if args.func and args.nu:
 		val.func = args.func
 		val.nu = args.nu
-		val.cyc_deform_max = args.deform
+		# val.cyc_deform_max = args.deform
 	else:
 		print('\n#####\nfunctionality and/or nu is not specified')
 		print('Default value will be used!')
 	if args.mode:
-		val.cyc_def_mode = args.mode
+		val.cyc_def_mode = args.mode.lower()
 	else:
 		print('\n#####\ndeformation mode is not set!')
 		sys.exit('either mode of shear or stretch should be set!')
-	if args.deform:
-		val.cyc_deform_max = args.deform
-	else:
-		print('\n#####\nMax deformation is not set !')
-		sys.exit('this value should be set!')
+	# if args.deform:
+	# 	val.cyc_deform_max = args.deform
+	# else:
+		# print('\n#####\nMax deformation is not set !')
+		# sys.exit('this value should be set!')
 	return
+
 # File Select
 def file_listing():
 	target = '*_out.udf'
@@ -65,7 +67,7 @@ def file_listing():
 	return 
 
 ############################
-# Calculate stress either for Shear or Stretch deformation
+# Calculate stress either for shear or stretch deformation
 def calc_stress_all():
 	val.ss_data = []
 	for list in val.sorted_udf:
@@ -105,6 +107,9 @@ def read_and_calc(target):
 			stress = (cell[0]*cell[1])*(stress_list[2]-(stress_list[0] + stress_list[1])/2.)/area_init
 			strain = uobj.get("Structure.Unit_Cell.Cell_Size.c")/z_init
 		data.append([str(strain), stress])
+	#
+	if val.cyc_def_mode == 'shear' and target.split('_')[1] == 'Forward':
+		val.cyc_deform_max = strain
 	return data
 
 ########################################

@@ -31,7 +31,7 @@ def read_arg():
 	parser = argparse.ArgumentParser(description='Evaluate deformed simulations !')
 	parser.add_argument('-f','--func', type=int, help="Functionality of junction point (int).")
 	parser.add_argument('-n', '--nu', type=float, help="Strand density of network (float).")
-	parser.add_argument('-m', '--mode', help="Mode of deformation; Shear or Stretch")
+	parser.add_argument('-m', '--mode', help="Mode of deformation; shear or stretch")
 	args = parser.parse_args()
 	if args.func and args.nu:
 		val.func = args.func
@@ -40,24 +40,26 @@ def read_arg():
 		print('\n#####\nfunctionality and/or nu is not specified')
 		print('Default value will be used!')
 	if args.mode:
-		val.simple_def_mode = args.mode
+		print('deform mode is set to ', args.mode.lower())
+		val.simple_def_mode = args.mode.lower()
 	else:
 		print('\n#####\ndeformation mode is not set!')
-		print('according to file name(Shear or Stretch), evaluation mode  will be set!')
+		print('according to file name(shear or stretch), evaluation mode  will be set!')
 	return
 # File Select
 def file_listing():
 	target = '*_out.udf'
 	udf_list = glob.glob(target)
 	if udf_list:
-		if udf_list[0].split('_')[0] in ['Shear', 'Stretch']:
-			val.simple_def_mode = udf_list[0].split('_')[0]
-		else:
-			print('\n#####\nfile name is not start from either Shear or Stretch.\ndefault mode of Stretch will be used!')
-			val.simple_def_mode = 'Stretch'
+		if val.simple_def_mode == '':
+			if udf_list[0].split('_')[0].lower() in ['shear', 'stretch']:
+				val.simple_def_mode = udf_list[0].split('_')[0]
+			else:
+				print('\n#####\nfile name is not start from either shear or stretch.\ndefault mode of stretch will be used!')
+				val.simple_def_mode = 'stretch'
 	else:
 		sys.exit('\n#####\nNo effective *_out.udf file in this directory !!\nSomething wrong !!\n')
-	if udf_list[0].split('_')[2][1] == 'e':
+	if (udf_list[0].split('_')[1] == 'rate') and ('e' in udf_list[0].split('_')[2]):
 		tmp = sorted([[i, float(i.split('_')[2])] for i in udf_list], key= itemgetter(1), reverse=True)
 		val.sorted_udf = list(np.array(tmp)[:,0])
 	else:
@@ -65,7 +67,7 @@ def file_listing():
 	return 
 
 ############################
-# Calculate stress either for Shear or Stretch deformation
+# Calculate stress either for shear or stretch deformation
 def calc_stress_all():
 	val.ss_data = []
 	for target in val.sorted_udf:
@@ -85,10 +87,10 @@ def read_and_calc(target):
 	for i in range(1, uobj.totalRecord()):
 		print("Reading Rec.=", i)
 		uobj.jump(i)
-		if val.simple_def_mode == 'Shear':
+		if val.simple_def_mode == 'shear':
 			stress = uobj.get('Statistics_Data.Stress.Total.Batch_Average.xy')
 			strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
-		elif val.simple_def_mode == 'Stretch':
+		elif val.simple_def_mode == 'stretch':
 			cell = uobj.get("Structure.Unit_Cell.Cell_Size")
 			stress_list = uobj.get("Statistics_Data.Stress.Total.Batch_Average")
 			stress = (cell[0]*cell[1])*(stress_list[2]-(stress_list[0] + stress_list[1])/2.)/area_init
@@ -100,7 +102,7 @@ def read_and_calc(target):
 # 計算結果をターゲットファイル名で保存
 def save_data():
 	for i, target_udf in enumerate(val.sorted_udf):
-		if (len(target_udf[0].split('_')) > 2) and (target_udf[0].split('_')[2][1] == 'e'):
+		if (len(target_udf.split('_')) > 2) and ('e' in target_udf.split('_')[2]):
 			target_rate = str(target_udf.split("_")[2])
 			target = "SS_rate_" + target_rate + '.dat'
 		else:
@@ -116,7 +118,7 @@ def save_data():
 # 結果をプロット
 def plot():
 	plot_ss()
-	if val.simple_def_mode == 'Stretch':
+	if val.simple_def_mode == 'stretch':
 		plot_mr()
 	return
 
@@ -143,11 +145,11 @@ def script_content():
 	val.script += '#set xrange [1:3]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
 	val.script += 'set xlabel "Strain"\nset ylabel "Stress"\n\n'
 	val.script += 'G=' + str(val.nu) + '\nfunc=' + str(val.func) + '\n'
-	if val.simple_def_mode == 'Stretch':
+	if val.simple_def_mode == 'stretch':
 		val.script += 'f(x,f)=f*G*(x-1./x**2.)\n'
 		val.script += '#f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
 		val.script += '#for shear uncomment and use 2nd eq\n'
-	elif val.simple_def_mode == 'Shear':
+	elif val.simple_def_mode == 'shear':
 		val.script += 'f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
 	val.script += 'f1=(func-1.)/(func+1.)\nf2=1.-2./func\n\n'
 	val.script += 'plot	'
