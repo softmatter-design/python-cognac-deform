@@ -26,7 +26,7 @@ def setup():
 	read_arg()
 	file_listing()
 	return
-
+2
 # Read argument 
 def read_arg():
 	parser = argparse.ArgumentParser(description='Evaluate deformed simulations !')
@@ -71,6 +71,7 @@ def file_listing():
 def calc_stress_all():
 	val.ss_data = []
 	for list in val.sorted_udf:
+		print(list)
 		tmp_data = []
 		for target in list:
 			print("Readin file = ", target)
