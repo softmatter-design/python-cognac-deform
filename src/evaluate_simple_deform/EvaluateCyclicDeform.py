@@ -97,19 +97,22 @@ def read_and_calc(target):
 		uobj.jump(i)
 		if val.cyc_def_mode == 'shear':
 			stress = uobj.get('Statistics_Data.Stress.Total.Batch_Average.xy')
-			if target.split('_')[1] == 'Forward':
-				strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
-			else:
-				strain = float(val.cyc_deform_max) + float(uobj.get('Structure.Unit_Cell.Shear_Strain'))
+			strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
+			# if target.split('_')[1] == 'Forward':
+			# 	strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
+			# else:
+			# 	strain = float(val.cyc_deform_max) + float(uobj.get('Structure.Unit_Cell.Shear_Strain'))
 		elif val.cyc_def_mode == 'stretch':
 			cell = uobj.get("Structure.Unit_Cell.Cell_Size")
 			stress_list = uobj.get("Statistics_Data.Stress.Total.Batch_Average")
 			stress = (cell[0]*cell[1])*(stress_list[2]-(stress_list[0] + stress_list[1])/2.)/area_init
 			strain = uobj.get("Structure.Unit_Cell.Cell_Size.c")/z_init
+
 		data.append([str(strain), stress])
 	#
-	if val.cyc_def_mode == 'shear' and target.split('_')[1] == 'Forward':
-		val.cyc_deform_max = strain
+	# if val.cyc_def_mode == 'shear' and target.split('_')[1] == 'Forward':
+	# 	print(strain)
+	# 	val.cyc_deform_max = strain
 	return data
 
 ########################################
