@@ -307,7 +307,7 @@ def set_dir():
 	val.base_udf = os.path.join(val.calc_dir, 'base.udf')
 	u = UDFManager(val.read_udf)
 	u.jump(1)
-	u.eraseRecord(record_pos=-999,record_num=-999)
+	u.eraseRecord(record_pos=0, record_num=u.totalRecord()-1)
 	u.write(val.base_udf)
 	return
 
@@ -451,7 +451,7 @@ def set_cyclic_dir():
 	u = UDFManager(val.read_udf)
 	u.jump(1)
 	val.system_size = float(u.get('Structure.Unit_Cell.Cell_Size.c'))
-	u.eraseRecord(record_pos=-999,record_num=-999)
+	u.eraseRecord(record_pos=0, record_num=u.totalRecord()-1)
 	u.write(val.base_udf)
 	val.cyc_readudf = 'base.udf'
 	return
