@@ -71,7 +71,6 @@ def file_listing():
 def calc_stress_all():
 	val.ss_data = []
 	for list in val.sorted_udf:
-		print(list)
 		tmp_data = []
 		for target in list:
 			print("Readin file = ", target)
@@ -98,11 +97,11 @@ def read_and_calc(target):
 		uobj.jump(i)
 		if val.cyc_def_mode == 'shear':
 			stress = uobj.get('Statistics_Data.Stress.Total.Batch_Average.xy')
-			strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
-			# if target.split('_')[1] == 'Forward':
-			# 	strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
-			# else:
-			# 	strain = float(val.cyc_deform_max) + float(uobj.get('Structure.Unit_Cell.Shear_Strain'))
+			# strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
+			if target.split('_')[1] == 'Forward':
+				strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
+			else:
+				strain = float(val.cyc_deform_max) + float(uobj.get('Structure.Unit_Cell.Shear_Strain'))
 		elif val.cyc_def_mode == 'stretch':
 			cell = uobj.get("Structure.Unit_Cell.Cell_Size")
 			stress_list = uobj.get("Statistics_Data.Stress.Total.Batch_Average")
@@ -111,9 +110,8 @@ def read_and_calc(target):
 
 		data.append([str(strain), stress])
 	#
-	# if val.cyc_def_mode == 'shear' and target.split('_')[1] == 'Forward':
-	# 	print(strain)
-	# 	val.cyc_deform_max = strain
+	if val.cyc_def_mode == 'shear' and target.split('_')[1] == 'Forward':
+		val.cyc_deform_max = strain
 	return data
 
 ########################################
