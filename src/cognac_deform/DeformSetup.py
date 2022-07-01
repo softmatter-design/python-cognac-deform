@@ -477,7 +477,7 @@ def make_cycle():
 		val.batch += val.ver_Cognac + ' -I ' + uin + ' -O ' + uout + ' -n ' + str(val.core) +' \n'
 		
 		udf_in =  os.path.join(val.calc_dir, uin)
-		mod_udf(udf_in)
+		mod_cycle_udf(udf_in)
 		val.cyc_readudf = uout
 
 	return
@@ -491,7 +491,7 @@ def make_title(title):
 	return
 
 #-----
-def mod_udf(udf_in):
+def mod_cycle_udf(udf_in):
 	if val.cyclic_deform == 'CyclicStretch':
 		deform_time = (val.cyc_def_max - 1)/val.cyc_rate
 		speed = val.cyc_rate*val.system_size
