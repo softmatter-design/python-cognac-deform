@@ -94,11 +94,15 @@ def read_and_calc(target):
 		uobj.jump(i)
 		if val.cyc_def_mode == 'shear':
 			stress = uobj.get('Statistics_Data.Stress.Total.Batch_Average.xy')
-			# strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
-			if target.split('_')[1] == 'Forward':
-				strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
+			tmp_strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
+			if tmp_strain >= 0:
+				strain = tmp_strain
 			else:
-				strain = float(val.cyc_deform_max) + float(uobj.get('Structure.Unit_Cell.Shear_Strain'))
+				strain = float(val.cyc_deform_max) + tmp_strain
+			# if target.split('_')[1] == 'Forward':
+			# 	strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
+			# else:
+			# 	strain = float(val.cyc_deform_max) + float(uobj.get('Structure.Unit_Cell.Shear_Strain'))
 		elif val.cyc_def_mode == 'stretch':
 			cell = uobj.get("Structure.Unit_Cell.Cell_Size")
 			stress_list = uobj.get("Statistics_Data.Stress.Total.Batch_Average")
