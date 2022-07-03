@@ -11,3 +11,5 @@ script = ''
 # values for cyclic
 cyc_def_mode = ''
 cyc_deform_max = 0.
+average = []
+smoothed = []

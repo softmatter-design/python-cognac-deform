@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ##### Import #############################################
+# from unittest import result
 from UDFManager import *
 import argparse
 import numpy as np
@@ -8,15 +9,17 @@ import glob
 import platform
 import subprocess
 import sys
-from operator import itemgetter
+
+from scipy.signal import savgol_filter
+# from operator import itemgetter
 
 import evaluate_simple_deform.values as val
-###########################################################
-# print("This is module!")
 ###########################################################
 def cyclic_deform():
 	setup()
 	calc_stress_all()
+	average()
+	smooth()
 	save_data()
 	plot_ss()
 	return
@@ -38,7 +41,6 @@ def read_arg():
 	if args.func and args.nu:
 		val.func = args.func
 		val.nu = args.nu
-		# val.cyc_deform_max = args.deform
 	else:
 		print('\n#####\nfunctionality and/or nu is not specified')
 		print('Default value will be used!')
@@ -47,11 +49,6 @@ def read_arg():
 	else:
 		print('\n#####\ndeformation mode is not set!')
 		sys.exit('either mode of shear or stretch should be set!')
-	# if args.deform:
-	# 	val.cyc_deform_max = args.deform
-	# else:
-		# print('\n#####\nMax deformation is not set !')
-		# sys.exit('this value should be set!')
 	return
 
 # File Select
@@ -114,6 +111,41 @@ def read_and_calc(target):
 		val.cyc_deform_max = strain
 	return data
 
+##########################
+#
+def average():
+	skip = 1
+	n = len(val.ss_data) - skip
+	tmp = [[0.,0.] for i in range(len(val.ss_data[0]))]
+	for data in val.ss_data[1:]:
+		for j, line in enumerate(data):
+			tmp[j][0] = float(line[0])
+			tmp[j][1] += float(line[1])
+	for data in tmp:
+		val.average.append([data[0], data[1]/n])
+	return
+
+###########
+#
+def smooth():
+	half = int(len(val.average)/2)
+	length = 5
+	forward = np.array(val.average[:half])
+	backward = np.array(val.average[half-1:])
+	print('for')
+	print(forward)
+	print(forward[1])
+	print('back')
+	print(backward)
+	sf_forward = savgol_filter(forward[1], length, 2)
+	sf_backward = savgol_filter(backward[1], length, 2)
+	for i, data in enumerate(sf_forward):
+		val.smoothed.extend([forward[i], data])
+	for i, data in enumerate(sf_backward):
+		val.smoothed.extend([backward[i], data])
+	print(val.smoothed)
+	return
+
 ########################################
 # 計算結果をターゲットファイル名で保存
 def save_data():
@@ -123,6 +155,9 @@ def save_data():
 			for line in data:
 				f.write(str(line[0]) + '\t' + str(line[1]) + '\n')
 			f.write('\n\n')
+		f.write('# Average\n\n')
+		for data in val.average:
+			f.write(f'{data[0]:}\t{data[1]:}\n')
 	return
 
 ############################
@@ -158,6 +193,7 @@ def script_content():
 	val.script += 'plot '
 	for i in range(len(val.ss_data)):
 		val.script += 'data ind ' + str(i) + ' w l lw 2 lt ' + str(i+1) + ' ti "#' + str(i) + '", \\\n'
+	val.script += 'data ind ' + str(i+1) + ' w l lw 2 lt ' + str(i+2) + ' ti "average", \\\n'
 	val.script += 'f(x,1) w l lw 2 lt 10 ti "Affin", \\\nf(x,f1) w l lw 2 lt 11 ti "Q. Pht.", \\\nf(x,f2) w l lw 2 lt 12 ti "Phantom"'
 	val.script += '\n\nreset'
 	return
