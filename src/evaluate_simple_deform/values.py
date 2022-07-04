@@ -12,4 +12,5 @@ script = ''
 cyc_def_mode = ''
 cyc_deform_max = 0.
 average = []
-smoothed = []
+smoothed_f = []
+smoothed_b = []

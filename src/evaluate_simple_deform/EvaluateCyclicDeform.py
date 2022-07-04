@@ -134,20 +134,23 @@ def average():
 def smooth():
 	half = int(len(val.average)/2)
 	length = 5
-	forward = np.array(val.average[:half])
+	tmp = val.average[:half]
+	tmp.insert(0, [0.,0.])
+	forward = np.array(tmp)
 	backward = np.array(val.average[half-1:])
-	print('for')
-	print(forward)
-	print(forward[1])
-	print('back')
-	print(backward)
-	sf_forward = savgol_filter(forward[1], length, 2)
-	sf_backward = savgol_filter(backward[1], length, 2)
+	# print('for')
+	# print(forward)
+	# print(forward[:,1])
+	# print('back')
+	# print(backward)
+	sf_forward = savgol_filter(forward[:,1], length, 2)
+	sf_backward = savgol_filter(backward[:,1], length, 2)
 	for i, data in enumerate(sf_forward):
-		val.smoothed.extend([forward[i], data])
+		val.smoothed_f.append([forward[i,0], data])
 	for i, data in enumerate(sf_backward):
-		val.smoothed.extend([backward[i], data])
-	print(val.smoothed)
+		val.smoothed_b.append([backward[i,0], data])
+	print(val.smoothed_f)
+	print(val.smoothed_b)
 	return
 
 ########################################
