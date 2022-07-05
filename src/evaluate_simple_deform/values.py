@@ -14,3 +14,4 @@ cyc_deform_max = 0.
 average = []
 smoothed_f = []
 smoothed_b = []
+hystloss = 0

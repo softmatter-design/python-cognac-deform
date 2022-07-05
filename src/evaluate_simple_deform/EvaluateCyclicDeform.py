@@ -18,8 +18,7 @@ import evaluate_simple_deform.values as val
 def cyclic_deform():
 	setup()
 	calc_stress_all()
-	average()
-	smooth()
+	post_calc()
 	save_data()
 	plot_ss()
 	return
@@ -117,6 +116,12 @@ def read_and_calc(target):
 
 ##########################
 #
+def post_calc():
+	average()
+	smooth()
+	calc_hystloss()
+	return
+
 def average():
 	skip = 1
 	n = len(val.ss_data) - skip
@@ -129,8 +134,6 @@ def average():
 		val.average.append([data[0], data[1]/n])
 	return
 
-###########
-#
 def smooth():
 	half = int(len(val.average)/2)
 	length = 5
@@ -141,12 +144,28 @@ def smooth():
 	sf_forward = savgol_filter(forward[:,1], length, 2)
 	sf_backward = savgol_filter(backward[:,1], length, 2)
 	for i, data in enumerate(sf_forward):
-		val.smoothed_f.append([forward[i,0], data])
+		if data > 0:
+			val.smoothed_f.append([forward[i,0], data])
+		else:
+			val.smoothed_f.append([forward[i,0], 0])
 	for i, data in enumerate(sf_backward):
-		val.smoothed_b.append([backward[i,0], data])
-	print(val.smoothed_f)
-	print(val.smoothed_b)
+		if data > 0:
+			val.smoothed_b.append([backward[i,0], data])
+		else:
+			val.smoothed_b.append([backward[i,0], 0])
 	return
+
+def calc_hystloss():
+	accum_f = integral(val.smoothed_f)
+	accum_b = integral(val.smoothed_b)
+	val.hystloss = (accum_f-accum_b)/accum_f
+	return
+
+def integral(func):
+	accum = 0
+	for x in range(len(func)-1):
+		accum += (func[x][1] + func[x+1][1])*abs(func[x+1][0] - func[x][0]) 
+	return accum
 
 ########################################
 # 計算結果をターゲットファイル名で保存
@@ -160,6 +179,13 @@ def save_data():
 		f.write('# Average\n\n')
 		for data in val.average:
 			f.write(f'{data[0]:}\t{data[1]:}\n')
+		f.write('\n\n')
+		f.write('# Smoothed\n\n')
+		for data in val.smoothed_f:
+			f.write(f'{data[0]:}\t{data[1]:}\n')
+		for data in val.smoothed_b:
+			f.write(f'{data[0]:}\t{data[1]:}\n')
+
 	return
 
 ############################
@@ -180,7 +206,7 @@ def script_content():
 	val.script = 'set term pngcairo font "Arial,14"\n\n'
 	val.script += '#set mono\nset colorsequence classic\n\n'
 	val.script += 'data = "SS.dat"\n'
-	val.script += 'set output "SS_multi.png"\n\n'
+	val.script += 'set output "CyclicDeform.png"\n\n'
 	val.script += 'set key left\nset size square\n'
 	val.script += '#set xrange [1:3]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
 	val.script += 'set xlabel "Strain"\nset ylabel "Stress"\n\n'
@@ -195,9 +221,31 @@ def script_content():
 	val.script += 'plot '
 	for i in range(len(val.ss_data)):
 		val.script += 'data ind ' + str(i) + ' w l lw 2 lt ' + str(i+1) + ' ti "#' + str(i) + '", \\\n'
-	val.script += 'data ind ' + str(i+1) + ' w l lw 2 lt ' + str(i+2) + ' ti "average", \\\n'
+	val.script += 'data ind ' + str(i+1) + ' w l lw 4 lt ' + str(i+2) + ' ti "average", \\\n'
 	val.script += 'f(x,1) w l lw 2 lt 10 ti "Affin", \\\nf(x,f1) w l lw 2 lt 11 ti "Q. Pht.", \\\nf(x,f2) w l lw 2 lt 12 ti "Phantom"'
+	val.script += '\n\nreset\n\n'
+	#
+	val.script += 'set term pngcairo font "Arial,14"\n\n'
+	val.script += '#set mono\nset colorsequence classic\n\n'
+	val.script += 'data = "SS.dat"\n'
+	val.script += 'set output "Smoothed.png"\n\n'
+	val.script += 'set key left\nset size square\n'
+	val.script += '#set xrange [1:3]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
+	val.script += 'set xlabel "Strain"\nset ylabel "Stress"\n\n'
+	val.script += 'G=' + str(val.nu) + '\nfunc=' + str(val.func) + '\n'
+	if val.cyc_def_mode == 'stretch':
+		val.script += 'f(x,f)=f*G*(x-1./x**2.)\n'
+		val.script += '#f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
+		val.script += '#for shear uncomment and use 2nd eq\n'
+	elif val.cyc_def_mode == 'shear':
+		val.script += 'f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
+	val.script += 'f1=(func-1.)/(func+1.)\nf2=1.-2./func\n\n'
+	val.script += f'set label 1 sprintf("Hyst. Loss Ratio = %.2f", {val.hystloss:}) at graph 0.1, 0.65\n\n'
+	val.script += 'plot '
+	val.script += 'data ind ' + str(len(val.ss_data)+1) + ' w l lw 2 lt 1 ti "Smoothed", \\\n'
+	val.script += 'f(x,1) w l lw 1 lt 10 ti "Affin", \\\nf(x,f1) w l lw 1 lt 11 ti "Q. Pht.", \\\nf(x,f2) w l lw 1 lt 12 ti "Phantom"'
 	val.script += '\n\nreset'
+
 	return
 
 
