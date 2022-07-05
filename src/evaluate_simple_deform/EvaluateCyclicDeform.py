@@ -138,11 +138,6 @@ def smooth():
 	tmp.insert(0, [0.,0.])
 	forward = np.array(tmp)
 	backward = np.array(val.average[half-1:])
-	# print('for')
-	# print(forward)
-	# print(forward[:,1])
-	# print('back')
-	# print(backward)
 	sf_forward = savgol_filter(forward[:,1], length, 2)
 	sf_backward = savgol_filter(backward[:,1], length, 2)
 	for i, data in enumerate(sf_forward):
