@@ -125,7 +125,10 @@ def post_calc():
 def average():
 	skip = 1
 	n = len(val.ss_data) - skip
-	tmp = [[0.,0.] for i in range(len(val.ss_data[0]))]
+	if val.cyc_def_mode == 'shear':
+		tmp = [[0.,0.] for i in range(len(val.ss_data[0]))]
+	elif val.cyc_def_mode == 'stretch':
+		tmp = [[1.0,0.] for i in range(len(val.ss_data[0]))]
 	for data in val.ss_data[1:]:
 		for j, line in enumerate(data):
 			tmp[j][0] = float(line[0])
@@ -138,7 +141,10 @@ def smooth():
 	half = int(len(val.average)/2)
 	length = 5
 	tmp = val.average[:half]
-	tmp.insert(0, [0.,0.])
+	if val.cyc_def_mode == 'shear':
+		tmp.insert(0, [0.,0.])
+	elif val.cyc_def_mode == 'stretch':
+		tmp.insert(0, [1.0,0.])
 	forward = np.array(tmp)
 	backward = np.array(val.average[half-1:])
 	sf_forward = savgol_filter(forward[:,1], length, 2)

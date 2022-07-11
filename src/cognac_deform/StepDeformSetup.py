@@ -8,7 +8,7 @@ import math
 import shutil
 import numpy as np
 import platform
-import pandas as pd
+# import pandas as pd
 ################################################################################
 # def main():
 # 	print("このスクリプトを直接読んでも、初期状態が入っていません。")

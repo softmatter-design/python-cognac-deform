@@ -36,6 +36,21 @@ cyc_rate = 0
 cyc_count = 0
 cyc_resol = 0
 
+# Step deformation
+step_deform = ''
+step_deform_max = 0.
+step_rate = 0.
+step_time = 0
+step_resolution = 0
+step_time2 = 0
+step_resolution2 = 0
+
+step_dir = ''
+step_readudf = ''
+step_direction = ''
+step_dirlist = []
+
+
 func = 4
 nu = 0.1
 
