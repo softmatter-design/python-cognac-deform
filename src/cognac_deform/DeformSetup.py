@@ -9,7 +9,7 @@ import os
 import platform
 import sys
 
-import cognac_deform.values as val
+import cognac_deform.variables as var
 ##### Main #####
 def deform():
 	# 各種条件を読み取り
@@ -37,8 +37,8 @@ def read_arg():
 		elif not os.access(args.udf, os.R_OK):
 			sys.exit('\nSelected udf of ', args.udf, ' seems not exist !\nbye now!!')
 		else:
-			val.read_udf = args.udf
-			# print('Selected udf file is ' + val.read_udf)
+			var.read_udf = args.udf
+			# print('Selected udf file is ' + var.read_udf)
 	else:
 		print('no udf file is selected')
 		sys.exit('select proper udf file to read.')
@@ -50,8 +50,8 @@ def read_nw_cond():
 		sys.exit("\n'target_condition.udf' is not exists.")
 	else:
 		cond_u = UDFManager('target_condition.udf')
-		val.func = cond_u.get('TargetCond.NetWork.N_Strands')
-		val.nu = cond_u.get('TargetCond.System.Nu')
+		var.func = cond_u.get('TargetCond.NetWork.N_Strands')
+		var.nu = cond_u.get('TargetCond.System.Nu')
 	return
 
 # シミュレーション条件を設定する。
@@ -113,23 +113,29 @@ def make_newudf():
 	StepDeformation:{
 		StepDeform:select{"none", "StepStretch", "StepShear"} "変形モードを選択",
 		StepStretch:{
-			StretchConditions[]:{
-				MaxDeformation:float "最大ひずみ",
-				DeformRate:float "これらは変形レート",
-				RelaxationTime:int "緩和を観測する時間",
-				Resolution:int "緩和時間の分割数",
-				Extended_RelaxationTime:int "緩和を観測する時間",
-				Extended_Resolution:int "緩和時間の分割数"
+			StretchConditions:{
+				Deformation:{
+					MaxDeformation:float "最大ひずみ",
+					DeformRate:float "変形レート",
+					DeformSteps:int "シミュレーションのステップ数"
+					}
+				Relaxation[]:{
+					RelaxationTime:int "緩和を観測する時間",
+					ClacSteps:int "緩和時間の分割数",
+					}
 				}
 			}
 		StepShear:{
-			ShearConditions[]:{
-				MaxDeformation:float "最大ひずみ",
-				DeformRate:float "これらは変形レート",
-				RelaxationTime:int "緩和を観測する時間",
-				Resolution:int "緩和時間の分割数",
-				Extended_RelaxationTime:int "緩和を観測する時間",
-				Extended_Resolution:int "緩和時間の分割数"
+			ShearConditions:{
+				Deformation:{
+					MaxDeformation:float "最大ひずみ",
+					DeformRate:float "変形レート",
+					DeformSteps:int "シミュレーションのステップ数"
+					}
+				Relaxation[]:{
+					RelaxationTime:int "緩和を観測する時間",
+					CalcSteps:int "緩和時間の分割数",
+					}
 				}
 			}
 		} "計算ターゲットの条件を設定"
@@ -159,42 +165,48 @@ def make_newudf():
 		"CyclicShear",
 			{
 				[
-					{2.0000000,
+					{2.0,
 					3,
-					[1.0000000e-03,1.0000000e-04]
-					1.0000000e-02
+					[1.0e-03,1.0e-04]
+					1.0e-02
 					}
-					{3.0000000,
+					{3.0,
 					3,
-					[1.0000000e-03,1.0000000e-04,1.0000000e-05]
-					1.0000000e-02
+					[1.0e-03,1.00e-04,1.00e-05]
+					1.00e-02
 					}
 				]
 			}
 			{
 				[
-					{2.0000000,
+					{2.00,
 					3,
-					[1.0000000e-03,1.0000000e-04]
-					1.0000000e-02
+					[1.0e-03,1.00e-04]
+					1.00e-02
 					}
-					{3.0000000,
+					{3.00,
 					3,
-					[1.0000000e-03,1.0000000e-04,1.0000000e-05]
-					1.0000000e-02
+					[1.00e-03,1.00e-04,1.00e-05]
+					1.00e-02
 					}
 				]
 			}
 		}
 	StepDeformation:{
-		"StepShear",
-		{
-		[{2.0,1e-02,1e5,200,1e5,200}]
+		"StepStretch",
+			{
+				{
+				{1.50,5.0e-02,100}
+				[{100000,500}{100000,100}]
+				}
+			}
+			{
+				{
+				{1.00,0.10,100}
+				[{100000,500}{100000,100}]
+				}
+			}
 		}
-		{
-		[{1.0,1.0,1e5,200,1e5,200}]
-		}
-	}
 	\end{data}
 	'''
 	###
@@ -227,75 +239,90 @@ def read_condition():
 	u = UDFManager('../deform_condition.udf')
 	u.jump(-1)
 	# 使用するCognacのバージョン
-	val.ver_Cognac = u.get('CalcConditions.Cognac_ver')
+	var.ver_Cognac = u.get('CalcConditions.Cognac_ver')
 	# 計算に使用するコア数
-	val.core = u.get('CalcConditions.Cores')
+	var.core = u.get('CalcConditions.Cores')
 	# Simple Deformation
-	val.simple_def_mode  = u.get('SimpleDeformation.DeformMode').lower()
-	if val.simple_def_mode == 'stretch':
-		val.sim_rate_list = u.get('SimpleDeformation.Stretch.DeformRate[]')
-		val.sim_deform_max = u.get('SimpleDeformation.Stretch.MaxDeformation')
-		val.sim_resolution = u.get('SimpleDeformation.Stretch.Resolution')
-		val.sim_deform = val.simple_def_mode
-	elif val.simple_def_mode == 'shear':
-		val.sim_rate_list = u.get('SimpleDeformation.Shear.DeformRate[]')
-		val.sim_deform_max = u.get('SimpleDeformation.Shear.MaxDeformation')
-		val.sim_resolution = u.get('SimpleDeformation.Shear.Resolution')
-		val.sim_deform = val.simple_def_mode
-	elif val.simple_def_mode == 'both':
-		val.sim_rate_list = u.get('SimpleDeformation.both.DeformRate[]')
-		val.sim_deform_max = u.get('SimpleDeformation.both.MaxDeformation')
-		val.sim_resolution = u.get('SimpleDeformation.both.Resolution')
+	var.simple_def_mode  = u.get('SimpleDeformation.DeformMode').lower()
+	if var.simple_def_mode == 'stretch':
+		var.sim_rate_list = u.get('SimpleDeformation.Stretch.DeformRate[]')
+		var.sim_deform_max = u.get('SimpleDeformation.Stretch.MaxDeformation')
+		var.sim_resolution = u.get('SimpleDeformation.Stretch.Resolution')
+		var.sim_deform = var.simple_def_mode
+	elif var.simple_def_mode == 'shear':
+		var.sim_rate_list = u.get('SimpleDeformation.Shear.DeformRate[]')
+		var.sim_deform_max = u.get('SimpleDeformation.Shear.MaxDeformation')
+		var.sim_resolution = u.get('SimpleDeformation.Shear.Resolution')
+		var.sim_deform = var.simple_def_mode
+	elif var.simple_def_mode == 'both':
+		var.sim_rate_list = u.get('SimpleDeformation.both.DeformRate[]')
+		var.sim_deform_max = u.get('SimpleDeformation.both.MaxDeformation')
+		var.sim_resolution = u.get('SimpleDeformation.both.Resolution')
 	# Cyclic Deformation
 	tmp = []
-	val.cyclic_deform = u.get('CycleDeformation.CyclicDeform')
-	if val.cyclic_deform == 'CyclicStretch':
+	var.cyclic_deform = u.get('CycleDeformation.CyclicDeform')
+	if var.cyclic_deform == 'CyclicStretch':
 		tmp = u.get('CycleDeformation.CyclicStretch.StretchConditions[]')
-	elif val.cyclic_deform == 'CyclicShear':
+	elif var.cyclic_deform == 'CyclicShear':
 		tmp = u.get('CycleDeformation.CyclicShear.ShearConditions[]')
 	for data in tmp:
-		val.cyc_deform_max.append(data[0])
-		val.cyc_repeat.append(data[1])
-		val.cyc_ratelist.append(data[2])
-		val.cyc_resolution.append(data[3])
+		var.cyc_deform_max.append(data[0])
+		var.cyc_repeat.append(data[1])
+		var.cyc_ratelist.append(data[2])
+		var.cyc_resolution.append(data[3])
 	# Step Deformation
-	val.step_deform = u.get('StepDeformation.StepDeform')
-	if val.step_deform == 'StepShear':
-		[val.step_deform_max, val.step_rate, val.step_time, val.step_resolution, val.step_time2, val.step_resolution2] = u.get('StepDeformation.StepShear.ShearConditions[0]')
-	elif val.step_deform == 'StepStretch':
-		[val.step_deform_max, val.step_rate, val.step_time, val.step_resolution, val.step_time2, val.step_resolution2] = u.get('StepDeformation.StepStretch.StretchConditions[0]')
+	var.step_deform = u.get('StepDeformation.StepDeform')
+	if var.step_deform == 'StepShear':
+		[var.step_deform_max, var.step_rate, var.step_steps] = u.get('StepDeformation.StepShear.ShearConditions.Deformation')
+		deform_time = var.step_deform_max/var.step_rate
+		#
+		var.step_relaxation = u.get('StepDeformation.StepShear.ShearConditions.Relaxation[]')
+	elif var.step_deform == 'StepStretch':
+		[var.step_deform_max, var.step_rate, var.step_steps] = u.get('StepDeformation.StepStretch.StretchConditions.Deformation')
+		deform_time = (var.step_deform_max - 1)/var.step_rate
+		#
+		var.step_relaxation = u.get('StepDeformation.StepStretch.StretchConditions.Relaxation[]')
 	#
-	if val.simple_def_mode == 'none' and val.cyclic_deform == 'none' and val.step_deform == 'none':
+	dt = min(var.sim_time_div, deform_time/var.step_steps)	# dt の暫定値を決定
+	total_steps = round(deform_time/dt)
+	interval = max(1, round(total_steps/var.step_steps))	# 整数値の interval を決定
+	dt = round(deform_time/var.step_steps/interval, 4)		# 小数点４桁で丸めたdtを決定
+	var.step_deform_time = [dt, total_steps, interval]
+	#
+	if var.simple_def_mode == 'none' and var.cyclic_deform == 'none' and var.step_deform == 'none':
 		sys.exit('No proper condition is selected.\nBye!')
 	return
 # 
 def init_calc():
 	text = "################################################" + "\n"
-	text += "Cores used for simulation\t\t" + str(val.core ) + "\n"
+	text += "Cores used for simulation\t\t" + str(var.core ) + "\n"
 	text += "################################################" + "\n"
-	if val.simple_def_mode != 'none':
-		text += "Deform mode:\t\t\t\t" + str(val.simple_def_mode) + "\n"
-		text += "Deform Rate:\t\t" + ', '.join(["{0:4.0e}".format(x) for x in val.sim_rate_list]) + "\n"
-		text += "Maximum Strain:\t\t\t\t" + str(val.sim_deform_max) + "\n"
-		text += "Resolution:\t\t\t\t" + str(round(val.sim_resolution,4)) + "\n"
+	if var.simple_def_mode != 'none':
+		text += "Deform mode:\t\t\t\t" + str(var.simple_def_mode) + "\n"
+		text += "Deform Rate:\t\t" + ', '.join([f"{x:.1e}" for x in var.sim_rate_list]) + "\n"
+		text += "Maximum Strain:\t\t\t\t" + str(var.sim_deform_max) + "\n"
+		text += "Resolution:\t\t\t\t" + str(round(var.sim_resolution,4)) + "\n"
 		text += "################################################" + "\n"
-	if val.cyclic_deform != 'none':
-		text += "Cyclic Deform mode:\t\t\t" + str(val.cyclic_deform) + "\n"
-		for i in range(len(val.cyc_deform_max)):
-			text += 'Cyclic condition #' + str(i) + '\n'
-			text += "\tMaximum Strain:\t\t\t" + str(val.cyc_deform_max[i]) + "\n"
-			text += "\tRepeat:\t\t\t\t" + str(val.cyc_repeat[i]) + "\n"
-			text += "\tCyclic Deform Rate:\t" + ', '.join(["{0:4.0e}".format(x) for x in val.cyc_ratelist[i]]) + "\n"
-			text += "\tResolution:\t\t\t" + str(round(val.cyc_resolution[i], 4)) + "\n"
+	if var.cyclic_deform != 'none':
+		text += "Cyclic Deform mode:\t\t\t" + str(var.cyclic_deform) + "\n"
+		for i in range(len(var.cyc_deform_max)):
+			text += f'Cyclic condition #{i}\n'
+			text += f"\tMaximum Strain:\t\t\t{var.cyc_deform_max[i]:.1f}\n"
+			text += f"\tRepeat:\t\t\t\t{var.cyc_repeat[i]}\n"
+			text += "\tCyclic Deform Rate:\t" + ', '.join([f"{x:.1e}" for x in var.cyc_ratelist[i]]) + "\n"
+			text += "\tResolution:\t\t\t" + str(round(var.cyc_resolution[i], 4)) + "\n"
 		text += "################################################" + "\n"
-	if val.step_deform != 'none':
-		text += f"Step Deform mode:\t\t\t{val.step_deform:}\n"
-		text += f"Step Strain:\t\t\t\t{val.step_deform_max:}\n"
-		text += f"Deformation rate:\t\t\t{val.step_rate:.2e}\n"
-		text += f"Relaxation Time:\t\t\t{val.step_time:.2e}\n"
-		text += f"Resolution:\t\t\t\t{val.step_resolution:}\n"
-		text += f"\tRelaxation Time2:\t\t{val.step_time2:.2e}\n"
-		text += f"\tResolution2:\t\t\t{val.step_resolution2:}\n"
+	if var.step_deform != 'none':
+		text += f"Step Deform mode:\t\t\t{var.step_deform:}\n"
+		text += f"Step Strain:\t\t\t\t{var.step_deform_max:.1f}\n"
+		text += f"Deformation rate:\t\t\t{var.step_rate:.1e}\n"
+		text += f"Deformation steps:\t\t\t{var.step_steps:}\n"
+		text += f"Simulation time:\t\t{var.step_deform_time:}\n"
+		text += "#\n"
+		for i, data in enumerate(var.step_relaxation):
+			text += f"Relaxation-{i:}\n"
+			text += f"\tRelaxation Time:\t\t{data[0]:.1e}\n"
+			text += f"\tCalc steps:\t\t\t{data[1]:}\n"
 		text += "################################################" + "\n"
 	print(text)
 	return
@@ -304,19 +331,19 @@ def init_calc():
 #
 def setup():
 	print("\n\nSetting UP progress !!\n")
-	if val.simple_def_mode != 'none':
+	if var.simple_def_mode != 'none':
 		setup_simple_deform()
-	if val.cyclic_deform != 'none':
+	if var.cyclic_deform != 'none':
 		setup_cyclic_deform()
-	if val.step_deform != 'none':
+	if var.step_deform != 'none':
 		setup_step_deform()
 	return
 
 #####
 #
 def setup_simple_deform():
-	if val.simple_def_mode == 'both':
-		for val.sim_deform in ['shear', 'stretch']:
+	if var.simple_def_mode == 'both':
+		for var.sim_deform in ['shear', 'stretch']:
 			# 計算用のディレクトリーを作成
 			set_dir()
 			# ファイル名を設定し、バッチファイルを作成
@@ -329,57 +356,57 @@ def setup_simple_deform():
 	return
 # 
 def set_dir():
-	val.calc_dir = val.sim_deform + '_calculation_read_' + val.read_udf.split('.')[0]
-	if os.path.exists(val.calc_dir):
-		print("Use existing dir of ", val.calc_dir)
+	var.calc_dir = var.sim_deform + '_calculation_read_' + var.read_udf.split('.')[0]
+	if os.path.exists(var.calc_dir):
+		print("Use existing dir of ", var.calc_dir)
 	else:
-		print("Make new dir of ", val.calc_dir)
-		os.makedirs(val.calc_dir)
+		print("Make new dir of ", var.calc_dir)
+		os.makedirs(var.calc_dir)
 	#
-	val.base_udf = os.path.join(val.calc_dir, 'base.udf')
-	u = UDFManager(val.read_udf)
+	var.base_udf = os.path.join(var.calc_dir, 'base.udf')
+	u = UDFManager(var.read_udf)
 	u.jump(1)
 	u.eraseRecord(record_pos=0, record_num=u.totalRecord()-1)
-	u.write(val.base_udf)
+	u.write(var.base_udf)
 	return
 
 # ファイル名を設定し、バッチファイルを作成
 def make_batch():
-	val.batch = "#!/bin/bash\n"
+	var.batch = "#!/bin/bash\n"
 	#
-	for rate in val.sim_rate_list:
+	for rate in var.sim_rate_list:
 		# UDFファイル名を設定
 		rate_str = "{0:4.0e}".format(rate)
-		if val.sim_deform == 'stretch':
+		if var.sim_deform == 'stretch':
 			uin = 'Stretch_rate_' + rate_str + "_uin.udf"
-		elif val.sim_deform == 'shear':
+		elif var.sim_deform == 'shear':
 			uin = 'Shear_rate_' + rate_str + "_uin.udf"
 		# 
 		make_title("Calculating rate_" + rate_str)
-		val.batch += val.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(val.core) +' \n'
-		val.batch += 'evaluate_simple_deform -f ' + str(val.func) + ' -n ' + str(val.nu) +'\n'
-		udf_in =  os.path.join(val.calc_dir, uin)
+		var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(var.core) +' \n'
+		var.batch += 'evaluate_simple_deform -f ' + str(var.func) + ' -n ' + str(var.nu) +'\n'
+		udf_in =  os.path.join(var.calc_dir, uin)
 		make_simpledeform_udf(udf_in, rate)
 	write_batchfile('_simpledeform.bat')
 	return
 
 #-----
 def make_simpledeform_udf(udf_in, rate):
-	if val.sim_deform == 'stretch':
-		deform_time = (val.sim_deform_max - 1)/rate
-	elif val.sim_deform == 'shear':
-		deform_time = val.sim_deform_max/rate
+	if var.sim_deform == 'stretch':
+		deform_time = (var.sim_deform_max - 1)/rate
+	elif var.sim_deform == 'shear':
+		deform_time = var.sim_deform_max/rate
 	#
-	time_total = round(deform_time/val.sim_time_div)
-	time_1_step = round(val.sim_resolution/val.sim_time_div/rate)
+	time_total = round(deform_time/var.sim_time_div)
+	time_1_step = round(var.sim_resolution/var.sim_time_div/rate)
 	#
-	u = UDFManager(val.base_udf)
+	u = UDFManager(var.base_udf)
 	# goto global data
 	u.jump(-1)
 	# Dynamics_Conditions
 	p = 'Simulation_Conditions.Dynamics_Conditions.'
 	u.put(100000.,		p + 'Max_Force')
-	u.put(val.sim_time_div,	p + 'Time.delta_T')
+	u.put(var.sim_time_div,	p + 'Time.delta_T')
 	u.put(time_total,	p + 'Time.Total_Steps')
 	u.put(time_1_step,	p + 'Time.Output_Interval_Steps')
 	u.put(1.0,			p + 'Temperature.Temperature')
@@ -387,7 +414,7 @@ def make_simpledeform_udf(udf_in, rate):
 	u.put(0,			p + 'Pressure_Stress.Pressure')
 
 	# Deformation
-	if val.sim_deform == 'stretch':
+	if var.sim_deform == 'stretch':
 		p = "Simulation_Conditions.Dynamics_Conditions.Deformation."
 		u.put('Cell_Deformation', 		p + 'Method')
 		u.put('Simple_Elongation', 		p + 'Cell_Deformation.Method')
@@ -397,7 +424,7 @@ def make_simpledeform_udf(udf_in, rate):
 		u.put('z', 						p + 'Cell_Deformation.Simple_Elongation.Axis')
 		u.put(1, 						p + 'Cell_Deformation.Interval_of_Deform')
 		u.put(0, 						p + 'Cell_Deformation.Deform_Atom')
-	elif val.sim_deform == 'shear':
+	elif var.sim_deform == 'shear':
 		p = "Simulation_Conditions.Dynamics_Conditions.Deformation."
 		u.put('Lees_Edwards', 	p + 'Method')
 		u.put('Steady', 		p + 'Lees_Edwards.Method')
@@ -433,18 +460,18 @@ def setup_cyclic_deform():
 	return
 
 def set_cyclic_basedir():
-	val.cyc_dir = val.cyclic_deform + '_read_' + val.read_udf.split('.')[0]
-	if os.path.exists(val.cyc_dir):
-		print("Use existing dir of ", val.cyc_dir)
+	var.cyc_dir = var.cyclic_deform + '_read_' + var.read_udf.split('.')[0]
+	if os.path.exists(var.cyc_dir):
+		print("Use existing dir of ", var.cyc_dir)
 	else:
-		print("Make new dir of ", val.cyc_dir)
-		os.makedirs(val.cyc_dir)
+		print("Make new dir of ", var.cyc_dir)
+		os.makedirs(var.cyc_dir)
 	return
 #
 def set_each_cycle():
-	for id, val.cyc_def_max in enumerate(val.cyc_deform_max):
-		for val.cyc_rate in val.cyc_ratelist[id]:
-			val.batch = "#!/bin/bash\n"
+	for id, var.cyc_def_max in enumerate(var.cyc_deform_max):
+		for var.cyc_rate in var.cyc_ratelist[id]:
+			var.batch = "#!/bin/bash\n"
 			set_cyclic_dir()
 			make_cycle_batch(id)
 			# バッチファイルを作成
@@ -452,79 +479,79 @@ def set_each_cycle():
 	return
 # 
 def set_cyclic_dir():
-	tmp_dir = 'Deform_until_' + str(val.cyc_def_max).replace('.', '_') + "_rate_" + f"{val.cyc_rate:.1e}".replace('.', '_')
-	val.cyc_dirlist.append(tmp_dir)
-	val.calc_dir = os.path.join(val.cyc_dir, tmp_dir)
-	if os.path.exists(val.calc_dir):
-		print("Use existing dir of ", val.calc_dir)
+	tmp_dir = 'Deform_until_' + str(var.cyc_def_max).replace('.', '_') + "_rate_" + f"{var.cyc_rate:.1e}".replace('.', '_')
+	var.cyc_dirlist.append(tmp_dir)
+	var.calc_dir = os.path.join(var.cyc_dir, tmp_dir)
+	if os.path.exists(var.calc_dir):
+		print("Use existing dir of ", var.calc_dir)
 	else:
-		print("Make new dir of ", val.calc_dir)
-		os.makedirs(val.calc_dir)
+		print("Make new dir of ", var.calc_dir)
+		os.makedirs(var.calc_dir)
 	#
-	val.base_udf = os.path.join(val.calc_dir, 'base.udf')
-	u = UDFManager(val.read_udf)
+	var.base_udf = os.path.join(var.calc_dir, 'base.udf')
+	u = UDFManager(var.read_udf)
 	u.jump(1)
-	val.system_size = float(u.get('Structure.Unit_Cell.Cell_Size.c'))
+	var.system_size = float(u.get('Structure.Unit_Cell.Cell_Size.c'))
 	u.eraseRecord(record_pos=0, record_num=u.totalRecord()-1)
-	u.write(val.base_udf)
-	val.cyc_readudf = 'base.udf'
+	u.write(var.base_udf)
+	var.cyc_readudf = 'base.udf'
 	return
 
 # ファイル名を設定し、バッチファイルを作成
 def make_cycle_batch(id):
-	for val.cyc_count in range(val.cyc_repeat[id]):
-		val.cyc_resol = val.cyc_resolution[id]
+	for var.cyc_count in range(var.cyc_repeat[id]):
+		var.cyc_resol = var.cyc_resolution[id]
 		make_cycle()
-		if val.cyclic_deform == 'CyclicStretch':
-			val.batch += 'evaluate_cyclic_deform -f ' + str(val.func) + ' -n ' + str(val.nu) + ' -m stretch\n'
-		elif val.cyclic_deform == 'CyclicShear':
-			val.batch += 'evaluate_cyclic_deform -f ' + str(val.func) + ' -n ' + str(val.nu) + ' -m shear\n'
+		if var.cyclic_deform == 'CyclicStretch':
+			var.batch += 'evaluate_cyclic_deform -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m stretch\n'
+		elif var.cyclic_deform == 'CyclicShear':
+			var.batch += 'evaluate_cyclic_deform -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m shear\n'
 	return
 #
 def make_cycle():
-	for val.cyc_direction in ['_Forward', '_Backward']:
-		make_title("Calculating_Cycle_until_" + str(val.cyc_def_max).replace('.', '_') + "_rate_" + f"{val.cyc_rate:.1e}".replace('.','_') + '_#' + str(val.cyc_count) + val.cyc_direction)
+	for var.cyc_direction in ['_Forward', '_Backward']:
+		make_title("Calculating_Cycle_until_" + str(var.cyc_def_max).replace('.', '_') + "_rate_" + f"{var.cyc_rate:.1e}".replace('.','_') + '_#' + str(var.cyc_count) + var.cyc_direction)
 		# UDFファイル名を設定
-		uin = '#' +str(val.cyc_count) + val.cyc_direction + "_uin.udf"
+		uin = '#' +str(var.cyc_count) + var.cyc_direction + "_uin.udf"
 		uout = uin.replace("uin", "out")
-		val.batch += val.ver_Cognac + ' -I ' + uin + ' -O ' + uout + ' -n ' + str(val.core) +' \n'
+		var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uout + ' -n ' + str(var.core) +' \n'
 		
-		udf_in =  os.path.join(val.calc_dir, uin)
+		udf_in =  os.path.join(var.calc_dir, uin)
 		mod_cycle_udf(udf_in)
-		val.cyc_readudf = uout
+		var.cyc_readudf = uout
 
 	return
 
 #-----
 def mod_cycle_udf(udf_in):
-	if val.cyclic_deform == 'CyclicStretch':
-		deform_time = (val.cyc_def_max - 1)/val.cyc_rate
-		speed = val.cyc_rate*val.system_size
-	elif val.cyclic_deform == 'CyclicShear':
-		deform_time = val.cyc_def_max/val.cyc_rate
+	if var.cyclic_deform == 'CyclicStretch':
+		deform_time = (var.cyc_def_max - 1)/var.cyc_rate
+		speed = var.cyc_rate*var.system_size
+	elif var.cyclic_deform == 'CyclicShear':
+		deform_time = var.cyc_def_max/var.cyc_rate
 	#
-	time_total = round(deform_time/val.sim_time_div)
-	time_1_step = round(val.cyc_resol/val.sim_time_div/val.cyc_rate)
+	time_total = round(deform_time/var.sim_time_div)
+	time_1_step = round(var.cyc_resol/var.sim_time_div/var.cyc_rate)
 	#
-	u = UDFManager(val.base_udf)
+	u = UDFManager(var.base_udf)
 	# goto global data
 	u.jump(-1)
 	# Dynamics_Conditions
 	p = 'Simulation_Conditions.Dynamics_Conditions.'
 	u.put(100000.,		p + 'Max_Force')
-	u.put(val.sim_time_div,	p + 'Time.delta_T')
+	u.put(var.sim_time_div,	p + 'Time.delta_T')
 	u.put(time_total,	p + 'Time.Total_Steps')
 	u.put(time_1_step,	p + 'Time.Output_Interval_Steps')
 	u.put(1.0,			p + 'Temperature.Temperature')
 	u.put(0, 			p + 'Temperature.Interval_of_Scale_Temp')
 	u.put(0,			p + 'Pressure_Stress.Pressure')
 	# Deformation
-	if val.cyclic_deform == 'CyclicStretch':
+	if var.cyclic_deform == 'CyclicStretch':
 		p = "Simulation_Conditions.Dynamics_Conditions.Deformation."
 		u.put('Cell_Deformation', 	p + 'Method')
 		u.put('Simple_Elongation', 	p + 'Cell_Deformation.Method')
 		u.put('Deformation_Speed', 	p + 'Cell_Deformation.Simple_Elongation.Input_Method')
-		if val.cyc_direction == '_Forward':
+		if var.cyc_direction == '_Forward':
 			u.put(speed, p + 'Cell_Deformation.Simple_Elongation.Deformation_Speed.Speed')
 		else:
 			u.put(-1.*speed, p + 'Cell_Deformation.Simple_Elongation.Deformation_Speed.Speed')
@@ -532,14 +559,14 @@ def mod_cycle_udf(udf_in):
 		u.put('z', 						p + 'Cell_Deformation.Simple_Elongation.Axis')
 		u.put(1, 						p + 'Cell_Deformation.Interval_of_Deform')
 		u.put(0, 						p + 'Cell_Deformation.Deform_Atom')
-	elif val.cyclic_deform == 'CyclicShear':
+	elif var.cyclic_deform == 'CyclicShear':
 		p = "Simulation_Conditions.Dynamics_Conditions.Deformation."
 		u.put('Lees_Edwards', 	p + 'Method')
 		u.put('Steady', 		p + 'Lees_Edwards.Method')
-		if val.cyc_direction == '_Forward':
-			u.put(val.cyc_rate, 		p + 'Lees_Edwards.Steady.Shear_Rate')
+		if var.cyc_direction == '_Forward':
+			u.put(var.cyc_rate, 		p + 'Lees_Edwards.Steady.Shear_Rate')
 		else:
-			u.put(-1.*val.cyc_rate, 	p + 'Lees_Edwards.Steady.Shear_Rate')
+			u.put(-1.*var.cyc_rate, 	p + 'Lees_Edwards.Steady.Shear_Rate')
 	# Output_Flags
 	u.put([1, 1, 1], 'Simulation_Conditions.Output_Flags.Structure')
 	# Read_Set_of_Molecules
@@ -548,7 +575,7 @@ def mod_cycle_udf(udf_in):
 	# Generate_Method
 	p = 'Initial_Structure.Generate_Method.'
 	u.put('Restart', 		p + 'Method')
-	u.put([val.cyc_readudf, -1, 1, 1], 	p + 'Restart')
+	u.put([var.cyc_readudf, -1, 1, 1], 	p + 'Restart')
 	# Relaxation
 	p = 'Initial_Structure.Relaxation.'
 	u.put(0, p + 'Relaxation')
@@ -560,7 +587,7 @@ def mod_cycle_udf(udf_in):
 # ファイル名を設定し、バッチファイルを作成
 def batch_series():
 	batch_series = ''
-	for subdir in val.cyc_dirlist:
+	for subdir in var.cyc_dirlist:
 		if platform.system() == "Windows":
 			batch_series += 'cd /d %~dp0\\' + subdir +'\n'
 			batch_series += 'call _deform.bat\n'
@@ -571,7 +598,7 @@ def batch_series():
 	if platform.system() == "Windows":
 		batch_series += 'cd /d %~dp0\n'
 
-	f_batch = os.path.join(val.cyc_dir, '_calc_all.bat')
+	f_batch = os.path.join(var.cyc_dir, '_calc_all.bat')
 	with open(f_batch, 'w') as f:
 		f.write(batch_series)
 		if platform.system() == "Linux":
@@ -589,81 +616,68 @@ def setup_step_deform():
 	
 # 
 def set_step_dir():
-	val.calc_dir = f'{val.step_deform:}_read_{val.read_udf.split(".")[0]:}_until_' + f'{val.step_deform_max:.1f}'.replace('.','_')
-	if os.path.exists(val.calc_dir):
-		print("Use existing dir of ", val.calc_dir)
+	var.calc_dir = f'{var.step_deform:}_read_{var.read_udf.split(".")[0]:}_until_' + f'{var.step_deform_max:.1f}'.replace('.','_')
+	if os.path.exists(var.calc_dir):
+		print("Use existing dir of ", var.calc_dir)
 	else:
-		print("Make new dir of ", val.calc_dir)
-		os.makedirs(val.calc_dir)
+		print("Make new dir of ", var.calc_dir)
+		os.makedirs(var.calc_dir)
 	#
-	val.base_udf = os.path.join(val.calc_dir, 'base.udf')
-	u = UDFManager(val.read_udf)
+	var.base_udf = os.path.join(var.calc_dir, 'base.udf')
+	u = UDFManager(var.read_udf)
 	u.jump(1)
 	u.eraseRecord(record_pos=0, record_num=u.totalRecord()-1)
-	u.write(val.base_udf)
+	u.write(var.base_udf)
 	return
 
 # ファイル名を設定し、バッチファイルを作成
 def make_step_batch():
-	val.batch = "#!/bin/bash\n"
+	var.batch = "#!/bin/bash\n"
 	# UDFファイル名を設定
-	if val.step_deform == 'StepStretch':
-		base = f'StepStretch_until_' + f'{val.step_deform_max:.1e}'.replace('.', '_') + '_rate_' + f'{val.step_rate:.1e}'.replace('.', '_') + '_uin.udf'
-		uin = base + '_uin.udf'
-		make_title(base)
-	elif val.step_deform == 'StepShear':
-		base = f'StepShear_until_' + f'{val.step_deform_max:.1e}'.replace('.', '_') + '_rate_' + f'{val.step_rate:.1e}'.replace('.', '_') + '_uin.udf'
-		uin = base + '_uin.udf'
-		make_title(base)
+	base = f'{var.step_deform}_until_' + f'{var.step_deform_max:.1e}'.replace('.', '_') + '_rate_' + f'{var.step_rate:.1e}'.replace('.', '_')
+	uin = base + '_uin.udf'
+	make_title(base)
 	# 
-	val.batch += val.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(val.core) +' \n'
-	val.batch += 'evaluate_step_deform ' + uin.replace("uin", "out") + f'-f {val.func} -n {val.nu} \n'
-	udf_in =  os.path.join(val.calc_dir, uin)
-	make_deform_udf(udf_in)
+	var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(var.core) +' \n'
+	var.batch += 'evaluate_step_deform ' + uin.replace("uin", "out") + f' -f {var.func} -n {var.nu} \n'
+	udf_in =  os.path.join(var.calc_dir, uin)
+	make_stepdeform_udf(udf_in)
 	# バッチファイルを作成
 	write_batchfile('_stepdeform.bat')
 	return
 
 #-----
-def make_deform_udf(udf_in):
-	if val.step_deform == 'StepStretch':
-		deform_time = (val.step_deform_max - 1)/val.step_rate
-	elif val.step_deform == 'StepShear':
-		deform_time = val.step_deform_max/val.step_rate
-	#
-	time_total = round(deform_time/val.sim_time_div)
-	time_1_step = round(val.sim_resolution/val.sim_time_div/rate)
-	#
-	u = UDFManager(val.base_udf)
+def make_stepdeform_udf(udf_in):
+	u = UDFManager(var.base_udf)
 	# goto global data
 	u.jump(-1)
 
 	# Dynamics_Conditions
 	p = 'Simulation_Conditions.Dynamics_Conditions.'
 	u.put(100000.,		p + 'Max_Force')
-	u.put(val.sim_time_div,	p + 'Time.delta_T')
-	u.put(time_total,	p + 'Time.Total_Steps')
-	u.put(time_1_step,	p + 'Time.Output_Interval_Steps')
+	u.put(var.step_deform_time[0],	p + 'Time.delta_T')
+	u.put(var.step_deform_time[1],	p + 'Time.Total_Steps')
+	u.put(var.step_deform_time[2],	p + 'Time.Output_Interval_Steps')
 	u.put(1.0,			p + 'Temperature.Temperature')
 	u.put(0, 			p + 'Temperature.Interval_of_Scale_Temp')
 	u.put(0,			p + 'Pressure_Stress.Pressure')
 
 	# Deformation
-	if val.sim_deform == 'stretch':
+	if var.step_deform == 'StepStretch':
 		p = "Simulation_Conditions.Dynamics_Conditions.Deformation."
 		u.put('Cell_Deformation', 		p + 'Method')
 		u.put('Simple_Elongation', 		p + 'Cell_Deformation.Method')
 		u.put('Initial_Strain_Rate', 	p + 'Cell_Deformation.Simple_Elongation.Input_Method')
-		u.put(rate,	 					p + 'Cell_Deformation.Simple_Elongation.Initial_Strain_Rate.Rate')
+		u.put(var.step_rate,	 					p + 'Cell_Deformation.Simple_Elongation.Initial_Strain_Rate.Rate')
 		u.put(0.5, 						p + 'Cell_Deformation.Simple_Elongation.Poisson_Ratio')
 		u.put('z', 						p + 'Cell_Deformation.Simple_Elongation.Axis')
 		u.put(1, 						p + 'Cell_Deformation.Interval_of_Deform')
 		u.put(0, 						p + 'Cell_Deformation.Deform_Atom')
-	elif val.sim_deform == 'shear':
+	elif var.step_deform == 'StepShear':
 		p = "Simulation_Conditions.Dynamics_Conditions.Deformation."
 		u.put('Lees_Edwards', 	p + 'Method')
 		u.put('Steady', 		p + 'Lees_Edwards.Method')
-		u.put(rate, 			p + 'Lees_Edwards.Steady.Shear_Rate')
+		u.put(var.step_rate, 			p + 'Lees_Edwards.Steady.Shear_Rate')
 	
 	# Output_Flags
 	u.put([1, 1, 1], 'Simulation_Conditions.Output_Flags.Structure')
@@ -692,16 +706,16 @@ def make_deform_udf(udf_in):
 # ターミナルのタイトルを設定
 def make_title(title):
 	if platform.system() == "Windows":
-		val.batch += "title " + title + "\n"
+		var.batch += "title " + title + "\n"
 	elif platform.system() == "Linux":
-		val.batch += r'echo -ne "\033]0; ' + title + ' \007"' + '\n'
+		var.batch += r'echo -ne "\033]0; ' + title + ' \007"' + '\n'
 	return
 #
 def write_batchfile(filename):
 	# バッチファイルを作成
-	f_batch = os.path.join(val.calc_dir, filename)
+	f_batch = os.path.join(var.calc_dir, filename)
 	with open(f_batch, 'w') as f:
-		f.write(val.batch)
+		f.write(var.batch)
 	if platform.system() == "Linux":
 		os.chmod(f_batch, 0o777)
 	return
