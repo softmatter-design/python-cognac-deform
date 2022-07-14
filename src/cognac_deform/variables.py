@@ -9,6 +9,7 @@ read_udf = ''
 base_udf = ''
 
 system_size = 0.
+sim_time_div = 0.01
 
 ##### Conditions #####
 # 変形モード
@@ -17,7 +18,6 @@ sim_deform = ''
 sim_rate_list = []
 sim_deform_max = 1
 sim_resolution = 0.
-sim_time_div = 0.01
 
 # Cyclic deformation
 cyclic_deform = ''
@@ -43,15 +43,14 @@ step_rate = 0.
 step_steps = 0
 step_deform_time = []
 
-step_relaxation = []
-# step_resolution = 0
-# step_time2 = 0
-# step_resolution2 = 0
-
 step_dir = ''
-step_readudf = ''
-step_direction = ''
+step_relaxation = []
+step_rotate = []
 step_dirlist = []
+
+
+# step_readudf = ''
+# step_direction = ''
 
 
 func = 4

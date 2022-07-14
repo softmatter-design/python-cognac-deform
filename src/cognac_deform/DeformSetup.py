@@ -5,6 +5,7 @@ from UDFManager import *
 
 import argparse
 import codecs
+import numpy as np
 import os
 import platform
 import sys
@@ -38,7 +39,6 @@ def read_arg():
 			sys.exit('\nSelected udf of ', args.udf, ' seems not exist !\nbye now!!')
 		else:
 			var.read_udf = args.udf
-			# print('Selected udf file is ' + var.read_udf)
 	else:
 		print('no udf file is selected')
 		sys.exit('select proper udf file to read.')
@@ -340,7 +340,7 @@ def setup():
 	return
 
 #####
-#
+# 単純変形の設定
 def setup_simple_deform():
 	if var.simple_def_mode == 'both':
 		for var.sim_deform in ['shear', 'stretch']:
@@ -387,7 +387,7 @@ def make_batch():
 		var.batch += 'evaluate_simple_deform -f ' + str(var.func) + ' -n ' + str(var.nu) +'\n'
 		udf_in =  os.path.join(var.calc_dir, uin)
 		make_simpledeform_udf(udf_in, rate)
-	write_batchfile('_simpledeform.bat')
+	write_batchfile(var.calc_dir, '_deform.bat',var.batch)
 	return
 
 #-----
@@ -450,13 +450,15 @@ def make_simpledeform_udf(udf_in, rate):
 	return
 
 #######
-#
+# 繰り返し変形の設定
+
 def setup_cyclic_deform():
 	set_cyclic_basedir()
 	#
 	set_each_cycle()
 	#
-	batch_series()
+	option = ''
+	make_batch_series(var.cyc_dirlist, var.cyc_dir, option)
 	return
 
 def set_cyclic_basedir():
@@ -475,7 +477,7 @@ def set_each_cycle():
 			set_cyclic_dir()
 			make_cycle_batch(id)
 			# バッチファイルを作成
-			write_batchfile('_cyclicdeform.bat')
+			write_batchfile(var.calc_dir, '_deform.bat', var.batch)
 	return
 # 
 def set_cyclic_dir():
@@ -583,67 +585,112 @@ def mod_cycle_udf(udf_in):
 	u.write(udf_in)
 	return
 
-#######################################
-# ファイル名を設定し、バッチファイルを作成
-def batch_series():
-	batch_series = ''
-	for subdir in var.cyc_dirlist:
-		if platform.system() == "Windows":
-			batch_series += 'cd /d %~dp0\\' + subdir +'\n'
-			batch_series += 'call _deform.bat\n'
-		elif platform.system() == "Linux":
-			batch_series += 'cd ./' + subdir +'\n'
-			batch_series += './_deform.bat\n'
-			batch_series += 'cd ../\n'
-	if platform.system() == "Windows":
-		batch_series += 'cd /d %~dp0\n'
-
-	f_batch = os.path.join(var.cyc_dir, '_calc_all.bat')
-	with open(f_batch, 'w') as f:
-		f.write(batch_series)
-		if platform.system() == "Linux":
-			os.chmod(f_batch, 0o777)
-	return
-
 #####
 #
 def setup_step_deform():
 	# 計算用のディレクトリーを作成
-	set_step_dir()
+	set_step_basedir()
 	# 
-	make_step_batch()
+	set_eachstep()
+	#
+	option = 'aaa'
+	make_batch_series(var.step_dirlist, var.step_dir, option)
 	return
 	
 # 
-def set_step_dir():
-	var.calc_dir = f'{var.step_deform:}_read_{var.read_udf.split(".")[0]:}_until_' + f'{var.step_deform_max:.1f}'.replace('.','_')
+def set_step_basedir():
+	var.step_dir = f'{var.step_deform:}_until_' + f'{var.step_deform_max:.1f}'.replace('.','_') + '_rate_' + f'{var.step_rate:.1e}'.replace('.', '_') + f'_read_{var.read_udf.split(".")[0]:}'
+	if os.path.exists(var.step_dir):
+		print("Use existing dir of ", var.step_dir)
+	else:
+		print("Make new dir of ", var.step_dir)
+		os.makedirs(var.step_dir)
+	return
+
+def set_eachstep():
+	if var.step_deform == 'StepShear':
+		var.step_rotate = ['base', 'x', 'y', 'z']
+	elif var.step_deform == 'StepStretch':
+		var.step_rotate = ['base', 'x', 'y']
+	for rotate in var.step_rotate:
+		set_rotate_dir(rotate)
+		set_udf_batch(rotate)
+
+	return
+
+def set_rotate_dir(rotate):
+	tmp_dir = f'rotate_{rotate}'
+	var.step_dirlist.append(tmp_dir)
+	var.calc_dir = os.path.join(var.step_dir, tmp_dir)
 	if os.path.exists(var.calc_dir):
 		print("Use existing dir of ", var.calc_dir)
 	else:
 		print("Make new dir of ", var.calc_dir)
 		os.makedirs(var.calc_dir)
-	#
 	var.base_udf = os.path.join(var.calc_dir, 'base.udf')
 	u = UDFManager(var.read_udf)
 	u.jump(1)
 	u.eraseRecord(record_pos=0, record_num=u.totalRecord()-1)
+	if rotate != 'base':
+		rotate_position(u, rotate)
 	u.write(var.base_udf)
 	return
 
-# ファイル名を設定し、バッチファイルを作成
-def make_step_batch():
+# アトムのポジションを回転
+def rotate_position(u, axis):
+	R = rotate(axis, np.pi/2.)
+	u.jump(u.totalRecord() - 1)
+	pos = u.get('Structure.Position.mol[].atom[]')
+	for i, mol in enumerate(pos):
+		for j, atom in enumerate(mol):
+			tmp = list(np.array(R).dot(np.array(atom)))
+			u.put(tmp, 'Structure.Position.mol[].atom[]', [i, j])
+	return
+
+def rotate(axis, deg):
+	if axis == 'x':
+		R = [
+			[1., 0., 0.],
+			[0., np.cos(deg), -1*np.sin(deg)],
+			[0., np.sin(deg), np.cos(deg)]
+		]
+	elif axis == 'y':
+		R = [
+			[np.cos(deg), 0., np.sin(deg)],
+			[0., 1., 0.],
+			[-1*np.sin(deg), 0., np.cos(deg)]
+		]
+	elif axis == 'z':
+		R = [
+			[np.cos(deg), -1*np.sin(deg), 0.],
+			[np.sin(deg), np.cos(deg), 0.],
+			[0., 0., 1.]
+		]
+	return R
+
+def set_udf_batch(rotate):
 	var.batch = "#!/bin/bash\n"
 	# UDFファイル名を設定
-	base = f'{var.step_deform}_until_' + f'{var.step_deform_max:.1e}'.replace('.', '_') + '_rate_' + f'{var.step_rate:.1e}'.replace('.', '_')
-	uin = base + '_uin.udf'
-	make_title(base)
-	# 
+	base = f'{var.step_deform}_until_' + f'{var.step_deform_max:.1e}'.replace('.', '_') + '_rate_' + f'{var.step_rate:.1e}'.replace('.', '_') + f'_{rotate}'
+	#
+	make_title(base+"_deform")
+	uin = 'deform_uin.udf'
 	var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(var.core) +' \n'
-	var.batch += 'evaluate_step_deform ' + uin.replace("uin", "out") + f' -f {var.func} -n {var.nu} \n'
 	udf_in =  os.path.join(var.calc_dir, uin)
 	make_stepdeform_udf(udf_in)
+	prev_udf = uin.replace("uin", "out")
+	#
+	for i, condition in enumerate(var.step_relaxation):
+		make_title(base+f'_relaxation_{i}')
+		uin = f'relaxation_{i}_uin.udf'
+		var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(var.core) +' \n'
+		udf_in =  os.path.join(var.calc_dir, uin)
+		make_steprelax_udf(udf_in, prev_udf, condition)
+		prev_udf = uin.replace("uin", "out")
+	#
+	var.batch += 'evaluate_step_deform ' + uin.replace("uin", "out") + f' -f {var.func} -n {var.nu} \n'
 	# バッチファイルを作成
-	write_batchfile('_stepdeform.bat')
+	write_batchfile(var.calc_dir, '_deform.bat', var.batch)
 	return
 
 #-----
@@ -698,9 +745,37 @@ def make_stepdeform_udf(udf_in):
 	u.write(udf_in)
 	return
 
+#-----
+def make_steprelax_udf(udf_in, prev_udf, condition):
+	u = UDFManager(var.base_udf)
+	# goto global data
+	u.jump(-1)
 
+	# Dynamics_Conditions
+	p = 'Simulation_Conditions.Dynamics_Conditions.'
+	u.put(100000.,		p + 'Max_Force')
+	u.put(var.sim_time_div,	p + 'Time.delta_T')
+	u.put(round(condition[0]/var.sim_time_div),	p + 'Time.Total_Steps')
+	u.put(round(condition[0]/var.sim_time_div/condition[1]),	p + 'Time.Output_Interval_Steps')
+	u.put(1.0,			p + 'Temperature.Temperature')
+	u.put(0, 			p + 'Temperature.Interval_of_Scale_Temp')
+	u.put(0,			p + 'Pressure_Stress.Pressure')
 
+	# Read_Set_of_Molecules
+	p = 'Initial_Structure.Read_Set_of_Molecules'
+	u.put([prev_udf, -1], p)
 
+	# Generate_Method
+	p = 'Initial_Structure.Generate_Method.'
+	u.put('Restart', 		p + 'Method')
+	u.put([prev_udf, -1, 1, 1], 	p + 'Restart')
+
+	# Relaxation
+	p = 'Initial_Structure.Relaxation.'
+	u.put(0, p + 'Relaxation')
+	#--- Write UDF ---
+	u.write(udf_in)
+	return
 
 ###########################################
 # ターミナルのタイトルを設定
@@ -711,46 +786,32 @@ def make_title(title):
 		var.batch += r'echo -ne "\033]0; ' + title + ' \007"' + '\n'
 	return
 #
-def write_batchfile(filename):
+def write_batchfile(dir, filename, batch_file):
 	# バッチファイルを作成
-	f_batch = os.path.join(var.calc_dir, filename)
+	f_batch = os.path.join(dir, filename)
 	with open(f_batch, 'w') as f:
-		f.write(var.batch)
+		f.write(batch_file)
 	if platform.system() == "Linux":
 		os.chmod(f_batch, 0o777)
 	return
 
-
-#################################################
-
-# アトムのポジションを回転
-def rotate_position(u, axis):
-	R = rotate(axis, np.pi/2.)
-	u.jump(u.totalRecord() - 1)
-	pos = u.get('Structure.Position.mol[].atom[]')
-	for i, mol in enumerate(pos):
-		for j, atom in enumerate(mol):
-			tmp = list(np.array(R).dot(np.array(atom)))
-			u.put(tmp, 'Structure.Position.mol[].atom[]', [i, j])
+#######################################
+# サブディレクトリを使うバッチファイルを作成
+def make_batch_series(subdir_list, dir, option):
+	batch_series = ''
+	for subdir in subdir_list:
+		if platform.system() == "Windows":
+			batch_series += 'cd /d %~dp0\\' + subdir +'\n'
+			batch_series += 'call _deform.bat\n'
+		elif platform.system() == "Linux":
+			batch_series += 'cd ./' + subdir +'\n'
+			batch_series += './_deform.bat\n'
+			batch_series += 'cd ../\n'
+	if platform.system() == "Windows":
+		batch_series += 'cd /d %~dp0\n'
+	if option != '':
+		batch_series += option
+	write_batchfile(dir, '_calc_all.bat', batch_series)
 	return
 
-def rotate(axis, deg):
-	if axis == 'x':
-		R = [
-			[1., 0., 0.],
-			[0., np.cos(deg), -1*np.sin(deg)],
-			[0., np.sin(deg), np.cos(deg)]
-		]
-	elif axis == 'y':
-		R = [
-			[np.cos(deg), 0., np.sin(deg)],
-			[0., 1., 0.],
-			[-1*np.sin(deg), 0., np.cos(deg)]
-		]
-	elif axis == 'z':
-		R = [
-			[np.cos(deg), -1*np.sin(deg), 0.],
-			[np.sin(deg), np.cos(deg), 0.],
-			[0., 0., 1.]
-		]
-	return R
+
