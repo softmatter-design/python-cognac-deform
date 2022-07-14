@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 ##########################
-import evaluate_simple_deform
+import evaluate_deform
 ##### Main #####
 def main():
-	evaluate_simple_deform.simple_deform()
+	evaluate_deform.simple_deform()
 	return
 ##########################
 # Main

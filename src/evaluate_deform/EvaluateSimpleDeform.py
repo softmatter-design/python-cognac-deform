@@ -10,7 +10,7 @@ import subprocess
 import sys
 from operator import itemgetter
 
-import evaluate_simple_deform.values as val
+import evaluate_deform.variables as var
 ###########################################################
 # print("This is module!")
 ###########################################################
@@ -34,14 +34,14 @@ def read_arg():
 	parser.add_argument('-m', '--mode', help="Mode of deformation; shear or stretch")
 	args = parser.parse_args()
 	if args.func and args.nu:
-		val.func = args.func
-		val.nu = args.nu
+		var.func = args.func
+		var.nu = args.nu
 	else:
 		print('\n#####\nfunctionality and/or nu is not specified')
 		print('Default value will be used!')
 	if args.mode:
 		print('deform mode is set to ', args.mode.lower())
-		val.simple_def_mode = args.mode.lower()
+		var.simple_def_mode = args.mode.lower()
 	else:
 		print('\n#####\ndeformation mode is not set!')
 		print('according to file name(shear or stretch), evaluation mode  will be set!')
@@ -51,29 +51,29 @@ def file_listing():
 	target = '*_out.udf'
 	udf_list = glob.glob(target)
 	if udf_list:
-		if val.simple_def_mode == '':
+		if var.simple_def_mode == '':
 			if udf_list[0].split('_')[0].lower() in ['shear', 'stretch']:
-				val.simple_def_mode = udf_list[0].split('_')[0]
+				var.simple_def_mode = udf_list[0].split('_')[0]
 			else:
 				print('\n#####\nfile name is not start from either shear or stretch.\ndefault mode of stretch will be used!')
-				val.simple_def_mode = 'stretch'
+				var.simple_def_mode = 'stretch'
 	else:
 		sys.exit('\n#####\nNo effective *_out.udf file in this directory !!\nSomething wrong !!\n')
 	if (udf_list[0].split('_')[1] == 'rate') and ('e' in udf_list[0].split('_')[2]):
 		tmp = sorted([[i, float(i.split('_')[2])] for i in udf_list], key= itemgetter(1), reverse=True)
-		val.sorted_udf = list(np.array(tmp)[:,0])
+		var.sorted_udf = list(np.array(tmp)[:,0])
 	else:
-		val.sorted_udf = sorted(udf_list, reverse=True)
+		var.sorted_udf = sorted(udf_list, reverse=True)
 	return 
 
 ############################
 # Calculate stress either for shear or stretch deformation
 def calc_stress_all():
-	val.ss_data = []
-	for target in val.sorted_udf:
+	var.ss_data = []
+	for target in var.sorted_udf:
 		print("Readin file = ", target)
 		#
-		val.ss_data.append(read_and_calc(target))
+		var.ss_data.append(read_and_calc(target))
 	return
 # Read Data
 def read_and_calc(target):
@@ -87,10 +87,10 @@ def read_and_calc(target):
 	for i in range(1, uobj.totalRecord()):
 		print("Reading Rec.=", i)
 		uobj.jump(i)
-		if val.simple_def_mode == 'shear':
+		if var.simple_def_mode == 'shear':
 			stress = uobj.get('Statistics_Data.Stress.Total.Batch_Average.xy')
 			strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
-		elif val.simple_def_mode == 'stretch':
+		elif var.simple_def_mode == 'stretch':
 			cell = uobj.get("Structure.Unit_Cell.Cell_Size")
 			stress_list = uobj.get("Statistics_Data.Stress.Total.Batch_Average")
 			stress = (cell[0]*cell[1])*(stress_list[2]-(stress_list[0] + stress_list[1])/2.)/area_init
@@ -101,16 +101,16 @@ def read_and_calc(target):
 ########################################
 # 計算結果をターゲットファイル名で保存
 def save_data():
-	for i, target_udf in enumerate(val.sorted_udf):
+	for i, target_udf in enumerate(var.sorted_udf):
 		if (len(target_udf.split('_')) > 2) and ('e' in target_udf.split('_')[2]):
 			target_rate = str(target_udf.split("_")[2])
 			target = "SS_rate_" + target_rate + '.dat'
 		else:
 			target = 'SS_' + target_udf.split('.')[0] + '.dat'
-		val.ss_data_list.append(target)
+		var.ss_data_list.append(target)
 		with open(target,'w') as f:
 			f.write('# Strain\tStress\n\n')
-			for line in val.ss_data[i]:
+			for line in var.ss_data[i]:
 				f.write(str(line[0]) + '\t' + str(line[1]) + '\n')
 	return
 
@@ -118,51 +118,51 @@ def save_data():
 # 結果をプロット
 def plot():
 	plot_ss()
-	if val.simple_def_mode == 'stretch':
+	if var.simple_def_mode == 'stretch':
 		plot_mr()
 	return
 
 # 必要なスクリプトを作成
 def plot_ss():
 	script_content()
-	with open(val.plt_file, 'w') as f:
-		f.write(val.script)
+	with open(var.plt_file, 'w') as f:
+		f.write(var.script)
 	#
 	if platform.system() == "Windows":
-		subprocess.call([val.plt_file], shell=True)
+		subprocess.call([var.plt_file], shell=True)
 	elif platform.system() == "Linux":
-		subprocess.call(['gnuplot ' + val.plt_file], shell=True)
+		subprocess.call(['gnuplot ' + var.plt_file], shell=True)
 	return
 
 # スクリプトの中身
 def script_content():
-	val.script = 'set term pngcairo font "Arial,14"\n\n'
-	val.script += '#set mono\nset colorsequence classic\n\n'
-	for i, filename in enumerate(val.ss_data_list):
-		val.script += 'data' + str(i) + ' = "' + filename + '"\n'
-	val.script += 'set output "SS_multi.png"\n\n'
-	val.script += 'set key left\nset size square\n'
-	val.script += '#set xrange [1:3]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
-	val.script += 'set xlabel "Strain"\nset ylabel "Stress"\n\n'
-	val.script += 'G=' + str(val.nu) + '\nfunc=' + str(val.func) + '\n'
-	if val.simple_def_mode == 'stretch':
-		val.script += 'f(x,f)=f*G*(x-1./x**2.)\n'
-		val.script += '#f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
-		val.script += '#for shear uncomment and use 2nd eq\n'
-	elif val.simple_def_mode == 'shear':
-		val.script += 'f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
-	val.script += 'f1=(func-1.)/(func+1.)\nf2=1.-2./func\n\n'
-	val.script += 'plot	'
-	for i, target in enumerate(val.ss_data_list):
-		val.script += 'data' + str(i) + ' w l lw 2 lt ' + str(i+1) + ' ti "rate: ' + (target.split('.')[0]).split('_')[2] + '", \\\n'
-	val.script += 'f(x,1) w l lw 2 lt 10 ti "Affin", \\\nf(x,f1) w l lw 2 lt 11 ti "Q. Pht.", \\\nf(x,f2) w l lw 2 lt 12 ti "Phantom"'
-	val.script += '\n\nreset'
+	var.script = 'set term pngcairo font "Arial,14"\n\n'
+	var.script += '#set mono\nset colorsequence classic\n\n'
+	for i, filename in enumerate(var.ss_data_list):
+		var.script += 'data' + str(i) + ' = "' + filename + '"\n'
+	var.script += 'set output "SS_multi.png"\n\n'
+	var.script += 'set key left\nset size square\n'
+	var.script += '#set xrange [1:3]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
+	var.script += 'set xlabel "Strain"\nset ylabel "Stress"\n\n'
+	var.script += 'G=' + str(var.nu) + '\nfunc=' + str(var.func) + '\n'
+	if var.simple_def_mode == 'stretch':
+		var.script += 'f(x,f)=f*G*(x-1./x**2.)\n'
+		var.script += '#f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
+		var.script += '#for shear uncomment and use 2nd eq\n'
+	elif var.simple_def_mode == 'shear':
+		var.script += 'f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
+	var.script += 'f1=(func-1.)/(func+1.)\nf2=1.-2./func\n\n'
+	var.script += 'plot	'
+	for i, target in enumerate(var.ss_data_list):
+		var.script += 'data' + str(i) + ' w l lw 2 lt ' + str(i+1) + ' ti "rate: ' + (target.split('.')[0]).split('_')[2] + '", \\\n'
+	var.script += 'f(x,1) w l lw 2 lt 10 ti "Affin", \\\nf(x,f1) w l lw 2 lt 11 ti "Q. Pht.", \\\nf(x,f2) w l lw 2 lt 12 ti "Phantom"'
+	var.script += '\n\nreset'
 	return
 
 ##############################
 # 
 def plot_mr():
-	for target in val.ss_data_list:
+	for target in var.ss_data_list:
 		plt_file = 'plot_MR_' + target.split('.')[0] + '.plt'
 		make_mr_script(plt_file, target)
 		#

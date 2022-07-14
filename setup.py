@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='cognac-deform',
-    version='0.0.2',
+    version='0.1',
     license='proprietary',
     description='Module Experiment',
 
@@ -19,8 +19,9 @@ setup(
     entry_points={
         "console_scripts": [
           'deform_setup = cognac_deform.deform_setup:main',
-          'evaluate_simple_deform = evaluate_simple_deform.eval_sim_def:main',
-          'evaluate_cyclic_deform = evaluate_simple_deform.eval_cyc_def:main'
+          'evaluate_simple_deform = evaluate_deform.eval_sim_def:main',
+          'evaluate_cyclic_deform = evaluate_deform.eval_cyc_def:main',
+          'evaluate_step_deform = evaluate_deform.eval_step_def:main'
         ]
     }
 )

@@ -1,2 +1,0 @@
-from .EvaluateSimpleDeform import simple_deform
-from .EvaluateCyclicDeform import cyclic_deform

@@ -521,7 +521,6 @@ def make_cycle():
 		udf_in =  os.path.join(var.calc_dir, uin)
 		mod_cycle_udf(udf_in)
 		var.cyc_readudf = uout
-
 	return
 
 #-----
