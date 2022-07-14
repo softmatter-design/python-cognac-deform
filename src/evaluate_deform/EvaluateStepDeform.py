@@ -16,8 +16,7 @@ from scipy.signal import savgol_filter
 import evaluate_deform.variables as var
 ###########################################################
 def step_deform():
-	print('ttt')
-	# setup()
+	setup()
 	# calc_stress_all()
 	# post_calc()
 	# save_data()
@@ -36,7 +35,7 @@ def read_arg():
 	parser.add_argument('-f','--func', type=int, help="Functionality of junction point (int).")
 	parser.add_argument('-n', '--nu', type=float, help="Strand density of network (float).")
 	parser.add_argument('-m', '--mode', help="Mode of deformation; shear or stretch")
-	# parser.add_argument('-d', '--deform', help="Maximum value of deformation")
+	parser.add_argument('-a', '--average', help="Average subdir data", action='store_true')
 	args = parser.parse_args()
 	if args.func and args.nu:
 		var.func = args.func
@@ -45,16 +44,19 @@ def read_arg():
 		print('\n#####\nfunctionality and/or nu is not specified')
 		print('Default value will be used!')
 	if args.mode:
-		var.cyc_def_mode = args.mode.lower()
+		var.step_def_mode = args.mode.lower()
 	else:
 		print('\n#####\ndeformation mode is not set!')
 		sys.exit('either mode of shear or stretch should be set!')
+	var.ave_flag = args.average
+	print(var.ave_flag)
 	return
 
 # File Select
 def file_listing():
-	target = '*_out.udf'
+	target = 'relax*_out.udf'
 	udf_list = glob.glob(target)
+	print(udf_list)
 	if udf_list:
 		tmp = sorted(udf_list, reverse=True)
 		for i in range(int(len(tmp)/2)):
