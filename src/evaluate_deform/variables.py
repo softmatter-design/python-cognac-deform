@@ -19,3 +19,6 @@ hystloss = 0
 # variables for step
 step_def_mode = ''
 ave_flag = 0
+step_readudfs = []
+step_relax_udfs = []
+step_deform_data = []
