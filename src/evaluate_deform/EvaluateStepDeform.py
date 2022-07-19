@@ -17,7 +17,9 @@ import evaluate_deform.variables as var
 ###########################################################
 def step_deform():
 	setup()
-	if not var.ave_flag:
+	if var.read_udf != '':
+		read_stress()
+	elif not var.ave_flag:
 		calc_stress_all()
 	else:
 		calc_average()
@@ -29,7 +31,7 @@ def step_deform():
 ##############
 def setup():
 	read_arg()
-	if not var.ave_flag:
+	if not var.ave_flag and var.read_udf == '':
 		file_listing()
 	return
 2
@@ -39,7 +41,9 @@ def read_arg():
 	parser.add_argument('-f','--func', type=int, help="Functionality of junction point (int).")
 	parser.add_argument('-n', '--nu', type=float, help="Strand density of network (float).")
 	parser.add_argument('-m', '--mode', help="Mode of deformation; shear or stretch")
-	parser.add_argument('-a', '--average', help="Average subdir data", action='store_true')
+	parser.add_argument('-u', '--udf', help="Setting UDF file to read")
+	parser.add_argument('-s', '--step', help="Flag for treating step calculation", action='store_true')
+	parser.add_argument('-a', '--average', help="Flag for averaging subdir data", action='store_true')
 	args = parser.parse_args()
 	if args.func and args.nu:
 		var.func = args.func
@@ -52,6 +56,12 @@ def read_arg():
 	else:
 		print('\n#####\ndeformation mode is not set!')
 		sys.exit('either mode of shear or stretch should be set!')
+	var.step_flag = args.step
+	if args.udf:
+		var.read_udf = args.udf
+	elif not var.step_flag:
+		print('Step_deformation mode is set')
+		var.step_flag = True
 	var.ave_flag = args.average
 	return
 
@@ -65,6 +75,11 @@ def file_listing():
 
 ############################
 # Calculate stress either for shear or stretch deformation
+def calc_stress_all():
+	for udf in var.step_readudfs:
+		print(udf)
+	return
+
 def read_step_stress(t_udf):
 	print("Readin file = ", t_udf)
 	area_init, z_init = calc_init(t_udf)
@@ -121,7 +136,7 @@ def read_step_stress(t_udf):
 	self.save_data(gt_step_mod, 'gt_step_mod.dat')
 	return gt_step, gt_step_mod
 
-def calc_init(self, target):
+def calc_init(target):
 	uobj = UDFManager(target)
 	uobj.jump(0)
 	#
@@ -133,53 +148,53 @@ def calc_init(self, target):
 	vol = uobj.get("Statistics_Data.Volume.Batch_Average")
 	return area_init, z_init
 
-	#----- 計算結果をターゲットファイル名で保存
-	def save_data(self, target, f_data):
-		with open(f_data,'w') as f:
-			for line in target:
-				for data in line:
-					f.write(str(data) + '\t')
-				f.write('\n')
-		self.plot(f_data)
-		return
+#----- 計算結果をターゲットファイル名で保存
+def save_data(target, f_data):
+	with open(f_data,'w') as f:
+		for line in target:
+			for data in line:
+				f.write(str(data) + '\t')
+			f.write('\n')
+	plot(f_data)
+	return
 
-	#----- 結果をプロット
-	def plot(self, f_data):
-		plt = self.make_script(f_data)
-		#
-		if platform.system() == "Windows":
-			subprocess.call([plt], shell=True)
-		elif platform.system() == "Linux":
-			subprocess.call(['gnuplot ' + plt], shell=True)
-		return
+#----- 結果をプロット
+def plot(f_data):
+	plt = make_script(f_data)
+	#
+	if platform.system() == "Windows":
+		subprocess.call([plt], shell=True)
+	elif platform.system() == "Linux":
+		subprocess.call(['gnuplot ' + plt], shell=True)
+	return
 	
-	# 必要なスクリプトを作成
-	def make_script(self, f_data):
-		script = self.script_content(f_data)
-		plt = f_data.replace('dat', 'plt')
-		with open(plt, 'w') as f:
-			f.write(script)
-		return plt
+# 必要なスクリプトを作成
+def make_script(f_data):
+	script = script_content(f_data)
+	plt = f_data.replace('dat', 'plt')
+	with open(plt, 'w') as f:
+		f.write(script)
+	return plt
 
-	# スクリプトの中身
-	def script_content(self, f_data):
-		out_png = f_data.replace('dat', 'png')
-		script = 'set term pngcairo font "Arial,14"\n\n'
-		script += 'set colorsequence classic\n\n'
-		script += 'data = "' + f_data + '"\n\n'
-		script += 'set output "' + out_png + '"\n\n'
-		script += 'set key left\nset size square\n'
-		script += '#set xrange [1:4]\n#set yrange [0:0.2]\n#set xtics 1\n#set ytics 0.1\nset y2tics\n'
-		if f_data == 'ss_step.dat':
-			script += 'set xlabel "Strain"\nset ylabel "(Nominal) Stress"\nset y2label "Temp."\n'
-			script += 'plot data u 1:2 axis x1y1 w l lw 2 lt 1 ti "stress", \\\n'
-		else:
-			script += 'set xlabel "Time"\nset ylabel "G(t)"\nset y2label "Temp."\n'	
-			script += 'plot	data u 1:2 axis x1y1 w l lw 2 lt 1 ti "G(t)", \\\n'
-		script += 'data u 1:3 axis x1y2 w l lw 2 lt 2 ti "Temp."'
-		script += '\n\nreset'
+# スクリプトの中身
+def script_content(f_data):
+	out_png = f_data.replace('dat', 'png')
+	script = 'set term pngcairo font "Arial,14"\n\n'
+	script += 'set colorsequence classic\n\n'
+	script += 'data = "' + f_data + '"\n\n'
+	script += 'set output "' + out_png + '"\n\n'
+	script += 'set key left\nset size square\n'
+	script += '#set xrange [1:4]\n#set yrange [0:0.2]\n#set xtics 1\n#set ytics 0.1\nset y2tics\n'
+	if f_data == 'ss_step.dat':
+		script += 'set xlabel "Strain"\nset ylabel "(Nominal) Stress"\nset y2label "Temp."\n'
+		script += 'plot data u 1:2 axis x1y1 w l lw 2 lt 1 ti "stress", \\\n'
+	else:
+		script += 'set xlabel "Time"\nset ylabel "G(t)"\nset y2label "Temp."\n'	
+		script += 'plot	data u 1:2 axis x1y1 w l lw 2 lt 1 ti "G(t)", \\\n'
+	script += 'data u 1:3 axis x1y2 w l lw 2 lt 2 ti "Temp."'
+	script += '\n\nreset'
 
-		return script
+	return script
 
 
 
