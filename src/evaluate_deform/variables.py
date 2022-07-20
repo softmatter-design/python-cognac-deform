@@ -18,10 +18,17 @@ hystloss = 0
 
 # variables for step
 step_def_mode = ''
-read_udf = ''
 step_flag = 0
 ave_flag = 0
-step_readudfs = []
+savgol_parameter = [5, 2]
+
+step_strain = 0.
+elapsed_time = 0
+
+# gt_step = []
+# gt_step_mod = []
+global_g = []
+global_time = []
+global_temp = []
+
 step_relax_udfs = []
-step_deform_data = []
-# uobj = ''

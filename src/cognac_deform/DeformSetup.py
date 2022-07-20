@@ -760,6 +760,9 @@ def make_steprelax_udf(udf_in, prev_udf, condition):
 	u.put(0, 			p + 'Temperature.Interval_of_Scale_Temp')
 	u.put(0,			p + 'Pressure_Stress.Pressure')
 
+	# Output_Flags
+	u.put([1, 1, 1], 'Simulation_Conditions.Output_Flags.Structure')
+	
 	# Read_Set_of_Molecules
 	p = 'Initial_Structure.Read_Set_of_Molecules'
 	u.put([prev_udf, -1], p)
