@@ -16,19 +16,12 @@ from scipy.signal import savgol_filter
 import evaluate_deform.variables as var
 ###########################################################
 def step_deform():
-	setup()
-	if var.step_flag and not var.ave_flag:
+	read_arg()	
+	if not var.ave_flag:
 		calc_stress_all()
 	else:
-		calc_average()
-	# post_calc()
-	# save_data()
-	# plot_ss()
-	return
-
-##############
-def setup():
-	read_arg()	
+		target = ['gt_all']
+		average(target)
 	return
 
 # Read argument 
@@ -38,7 +31,7 @@ def read_arg():
 	parser.add_argument('-n', '--nu', type=float, help="Strand density of network (float).")
 	parser.add_argument('-m', '--mode', help="Mode of deformation; shear or stretch")
 	# parser.add_argument('-u', '--udf', help="Setting UDF file to read")
-	parser.add_argument('-s', '--step', help="Flag for treating step calculation", action='store_true')
+	# parser.add_argument('-s', '--step', help="Flag for treating step calculation", action='store_true')
 	parser.add_argument('-a', '--average', help="Flag for averaging subdir data", action='store_true')
 	args = parser.parse_args()
 	if args.func and args.nu:
@@ -52,7 +45,7 @@ def read_arg():
 	else:
 		print('\n#####\ndeformation mode is not set!')
 		sys.exit('either mode of shear or stretch should be set!')
-	var.step_flag = args.step
+	# var.step_flag = args.step
 	var.ave_flag = args.average
 	return
 
@@ -125,6 +118,52 @@ def calc_init(target):
 	z_init = cell[2]
 	return z_init
 
+#########################################################################
+#-----
+def calc_relax_all():
+	for target in glob.glob('relax*_out.udf') :
+		print("Readin file = ", target)
+		read_relax(target)
+	
+	mod_g = savgol_filter(var.global_g, var.savgol_parameter[0], var.savgol_parameter[1])
+	total_g = np.stack([var.global_time, var.global_g, var.global_temp],1)
+	total_g_mod = np.stack([var.global_time, mod_g, var.global_temp],1)
+	save_data(total_g, 'gt_all.dat')
+	save_data(total_g_mod, 'gt_all_mod.dat')
+	return
+
+#----- Read Data
+def read_relax(target):
+	uobj = UDFManager(target)
+	time = []
+	g = []
+	temp = []
+	prev_g = 0.
+	for i in range(1, uobj.totalRecord()):
+		print("Reading Rec.=", i)
+		uobj.jump(i)
+		#
+		time.append(uobj.get("Time") + var.elapsed_time)
+		temp.append(uobj.get('Statistics_Data.Temperature.Batch_Average'))
+		#
+		if var.step_def_mode == 'stretch':
+			stress_list = uobj.get("Statistics_Data.Stress.Total.Batch_Average")
+			tmp_stress = stress_list[2]-(stress_list[0] + stress_list[1])/2.
+			tmp_g = tmp_stress/(var.step_strain**2 - 1/var.step_strain)
+		elif var.step_def_mode == 'shear':
+			tmp_stress = uobj.get('Statistics_Data.Stress.Total.Batch_Average.xy')
+			tmp_g = tmp_stress/var.step_strain
+		if tmp_g <=0:
+			tmp_g = prev_g
+		g.append(tmp_g)
+		prev_g = tmp_g
+	var.global_time.extend(time)
+	var.global_g.extend(g)
+	var.global_temp.extend(temp)
+	var.elapsed_time = time[-1]
+	return
+
+###############################
 #----- 計算結果をターゲットファイル名で保存
 def save_data(target, f_data):
 	with open(f_data,'w') as f:
@@ -189,146 +228,11 @@ def script_content(f_data):
 		script += '[1000:] G*f1 w l lw 3 dt (10, 5) lt 9 ti "Q. Pht.", \\\n'
 		script += '[1000:] G*f2 w l lw 3 dt (10, 5) lt 7 ti "Phantom"'
 	script += '\n\nreset'
-
 	return script
 
 
-
-
-
-
-
-
-
-#########################################################################
-#-----
-def calc_relax_all():
-	for target in glob.glob('relax*_out.udf') :
-		print("Readin file = ", target)
-		read_relax(target)
-	
-	mod_g = savgol_filter(var.global_g, var.savgol_parameter[0], var.savgol_parameter[1])
-	total_g = np.stack([var.global_time, var.global_g, var.global_temp],1)
-	total_g_mod = np.stack([var.global_time, mod_g, var.global_temp],1)
-	save_data(total_g, 'gt_all.dat')
-	save_data(total_g_mod, 'gt_all_mod.dat')
-	return
-
-#----- Read Data
-def read_relax(target):
-	uobj = UDFManager(target)
-	time = []
-	g = []
-	temp = []
-	print('OK')
-	prev_g = 0.
-	for i in range(1, uobj.totalRecord()):
-		print("Reading Rec.=", i)
-		uobj.jump(i)
-		#
-		time.append(uobj.get("Time") + var.elapsed_time)
-		temp.append(uobj.get('Statistics_Data.Temperature.Batch_Average'))
-		#
-		if var.step_def_mode == 'stretch':
-			stress_list = uobj.get("Statistics_Data.Stress.Total.Batch_Average")
-			tmp_stress = stress_list[2]-(stress_list[0] + stress_list[1])/2.
-			tmp_g = tmp_stress/(var.step_strain**2 - 1/var.step_strain)
-		elif var.step_def_mode == 'shear':
-			tmp_stress = uobj.get('Statistics_Data.Stress.Total.Batch_Average.xy')
-			tmp_g = tmp_stress/var.step_strain
-		if tmp_g <=0:
-			tmp_g = prev_g
-		g.append(tmp_g)
-		prev_g = tmp_g
-	var.global_time.extend(time)
-	var.global_g.extend(g)
-	var.global_temp.extend(temp)
-	var.elapsed_time = time[-1]
-	return
-
-
-
-	def smooth(self, data, position, condition):
-		data_ar = np.array(data)
-		data = data_ar[:, position]
-		mod_data = signal.savgol_filter(data, condition[0], condition[1])
-		mod_list = np.concatenate([data_ar[:, :position], mod_data.reshape(data.shape[0], 1), data_ar[:, position+1:]], 1)
-		return mod_list
-
-	#----- 結果をプロット
-	def plot_gt(self, data, f_data):
-		self.save_data(data, f_data)
-		plt = self.make_script_gt(f_data)
-		# self.make_script_gw(func, deform, nu)
-		if platform.system() == "Windows":
-			subprocess.call([plt], shell=True)
-			# subprocess.call([self.plt_gw], shell=True)
-		elif platform.system() == "Linux":
-			subprocess.call(['gnuplot ' + plt], shell=True)
-			# subprocess.call(['gnuplot ' + self.plt_gw], shell=True)
-		return
-
-	# 必要なスクリプトを作成
-	def make_script_gt(self, f_data):
-		script = self.script_gt(f_data)
-		plt = f_data.replace('dat', 'plt')
-		with open(plt, 'w') as f:
-			f.write(script)
-		return plt
-
-	# スクリプトの中身
-	def script_gt(self, f_data):
-		out_png = f_data.replace('dat', 'png')
-		script = 'set term pngcairo font "Arial,14"\n\n'
-		script += '#set mono\nset colorsequence classic\n\n'
-		script += 'data = "' + f_data + '"\n\n'
-		script += 'set output "' + out_png + '"\n\n'
-		script += '#set key left\nset size square\n'
-		script += 'set logscale xy\n\n'
-		script += 'set xrange [0:]\n#set yrange [0.01:0.03]\n#set xtics 1\n#set ytics (0.01, 0.015, 0.02, 0.03)\n'
-		script += 'set xlabel "Time"\nset ylabel "G(t)"\n\n'
-		#
-		if self.func != 0:
-			script += 'G=' + str(self.nu) + '\n'
-			script += 'func = ' + str(self.func) + '\n'
-			script += 'f1 = (func - 1.)/(func + 1.)\nf2 = 1. - 2./func\n\n'
-			#
-			script += 'tau = 500\nst = G\neq = G\n'
-			script += 's = 200\ne = 100000\n'
-			script += 'g(x) = eq -(eq - st)*exp(-x/tau)\n'
-			script += 'fit [s:e] g(x) data via st, eq, tau\n\n'
-			#
-			script += 'set label 1 sprintf("{/Symbol t} = %.2e", tau) at graph 0.1, 0.2\n'
-			# script += 'set label 2 sprintf("{/Symbol s}(0) = %.3e", st) at graph 0.1, 0.2\n'
-			script += 'set label 3 sprintf("{/Symbol s}_{eq} = %.2e", eq) at graph 0.1, 0.1\n'
-			script += 'set label 4 "{/Symbol s}_{nom}(t) = {/Symbol s}_{eq} - ({/Symbol s}_{eq} - {/Symbol s}(0))*exp(-t/{/Symbol t})" at graph 0.2, 0.6\n'
-			script += 'set label 5 sprintf("fitting region: from %.d", s) at graph 0.1, 0.3\n'
-			script += 'set label 6 sprintf("{/Symbol n}k_BT = %.2e", G) at graph 0.6, 0.1\n\n'
-		#
-		script += 'plot	'
-		script += 'data u 1:2 w l lw 2 lt 1 ti "Quench from {/Symbol l}= ' + str(round(self.deform, 2)) + '"'
-		if self.func != 0:
-			script += ', \\\n [s:e] g(x) w l lw 2 lt 2 ti "fit", \\\n'
-			script += '[1000:] G w l lw 3 dt (10, 5) lt 8 ti "Affin"'
-			script += ', \\\n[1000:] G*f1 w l lw 3 dt (10, 5) lt 9 ti "Q. Pht.", \\\n'
-			script += '[1000:] G*f2 w l lw 3 dt (10, 5) lt 7 ti "Phantom"'
-		script += '\n\nreset'
-		return script
-
-
-
-
-
-
-
-
-
-
-
-
-
-def average():
-	target = ['gt_all']
+###############################
+def average(target):
 	for name in target:
 		dat_list = glob.glob('**/' + name + '.dat', recursive = True)
 		val_list = []
@@ -342,6 +246,7 @@ def average():
 				val_list.append(tmp)
 		ave_list = np.average(np.array(val_list), axis = 0)
 		res = np.stack([time, ave_list], 1)
+		save_data(res, name + '_averaged.dat')
 
 
 

@@ -592,7 +592,10 @@ def setup_step_deform():
 	# 
 	set_eachstep()
 	#
-	option = 'aaa'
+	if var.step_deform == 'StepStretch':
+		option = f'evaluate_step_deform -f {var.func} -n {var.nu} -m stretch -a\n'
+	elif var.step_deform == 'StepShear':
+		option = f'evaluate_step_deform -f {var.func} -n {var.nu} -m shear -a\n'
 	make_batch_series(var.step_dirlist, var.step_dir, option)
 	return
 	
@@ -687,7 +690,10 @@ def set_udf_batch(rotate):
 		make_steprelax_udf(udf_in, prev_udf, condition)
 		prev_udf = uin.replace("uin", "out")
 	#
-	var.batch += 'evaluate_step_deform ' + uin.replace("uin", "out") + f' -f {var.func} -n {var.nu} \n'
+	if var.step_deform == 'StepStretch':
+		var.batch += f'evaluate_step_deform -f {var.func} -n {var.nu} -m stretch\n'
+	elif var.step_deform == 'StepShear':
+		var.batch += f'evaluate_step_deform -f {var.func} -n {var.nu} -m shear\n'
 	# バッチファイルを作成
 	write_batchfile(var.calc_dir, '_deform.bat', var.batch)
 	return
@@ -805,14 +811,13 @@ def make_batch_series(subdir_list, dir, option):
 		if platform.system() == "Windows":
 			batch_series += 'cd /d %~dp0\\' + subdir +'\n'
 			batch_series += 'call _deform.bat\n'
+			batch_series += 'cd /d %~dp0\n'
 		elif platform.system() == "Linux":
 			batch_series += 'cd ./' + subdir +'\n'
 			batch_series += './_deform.bat\n'
 			batch_series += 'cd ../\n'
-	if platform.system() == "Windows":
-		batch_series += 'cd /d %~dp0\n'
-	if option != '':
-		batch_series += option
+		if option != '':
+			batch_series += option
 	write_batchfile(dir, '_calc_all.bat', batch_series)
 	return
 
