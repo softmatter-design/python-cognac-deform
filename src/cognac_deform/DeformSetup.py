@@ -283,11 +283,12 @@ def read_condition():
 		#
 		var.step_relaxation = u.get('StepDeformation.StepStretch.StretchConditions.Relaxation[]')
 	#
-	dt = min(var.sim_time_div, deform_time/var.step_steps)	# dt の暫定値を決定
-	total_steps = round(deform_time/dt)
-	interval = max(1, round(total_steps/var.step_steps))	# 整数値の interval を決定
-	dt = round(deform_time/var.step_steps/interval, 4)		# 小数点４桁で丸めたdtを決定
-	var.step_deform_time = [dt, total_steps, interval]
+	if var.step_deform != 'none':
+		dt = min(var.sim_time_div, deform_time/var.step_steps)	# dt の暫定値を決定
+		total_steps = round(deform_time/dt)
+		interval = max(1, round(total_steps/var.step_steps))	# 整数値の interval を決定
+		dt = round(deform_time/var.step_steps/interval, 4)		# 小数点４桁で丸めたdtを決定
+		var.step_deform_time = [dt, total_steps, interval]
 	#
 	if var.simple_def_mode == 'none' and var.cyclic_deform == 'none' and var.step_deform == 'none':
 		sys.exit('No proper condition is selected.\nBye!')
