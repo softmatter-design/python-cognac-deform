@@ -385,7 +385,7 @@ def make_batch():
 		# 
 		make_title("Calculating rate_" + rate_str)
 		var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(var.core) +' \n'
-		var.batch += 'evaluate_simple_deform -f ' + str(var.func) + ' -n ' + str(var.nu) +'\n'
+		var.batch += f'evaluate_simple_deform -f {str(var.func):} -n {str(var.nu):} -m {var.sim_deform:} \n'
 		udf_in =  os.path.join(var.calc_dir, uin)
 		make_simpledeform_udf(udf_in, rate)
 	write_batchfile(var.calc_dir, '_deform.bat',var.batch)
