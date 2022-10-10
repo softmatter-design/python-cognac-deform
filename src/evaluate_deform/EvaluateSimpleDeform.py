@@ -142,20 +142,20 @@ def script_content():
 		var.script += 'data' + str(i) + ' = "' + filename + '"\n'
 	var.script += 'set output "SS_multi.png"\n\n'
 	var.script += 'set key left\nset size square\n'
-	var.script += '#set xrange [1:3]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
 	var.script += 'set xlabel "Strain"\nset ylabel "Stress"\n\n'
 	var.script += 'G=' + str(var.nu) + '\nfunc=' + str(var.func) + '\n'
 	if var.simple_def_mode == 'stretch':
-		var.script += 'f(x,f)=f*G*(x-1./x**2.)\n'
-		var.script += '#f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
-		var.script += '#for shear uncomment and use 2nd eq\n'
+		var.script += 'set xrange [1:3]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n\n'
+		var.script += 'a(x)=G*(x-1./x**2.)\n'
+		var.script += 'p(x)=G*(1.-2./func)*(x-1./x**2.)\n\n' 
 	elif var.simple_def_mode == 'shear':
-		var.script += 'f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
-	var.script += 'f1=(func-1.)/(func+1.)\nf2=1.-2./func\n\n'
+		var.script += 'set xrange [0:2]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
+		var.script += 'a(x)=2*G*x\n'
+		var.script += 'p(x)=2*G*(1.-2./func)*x\n\n'
 	var.script += 'plot	'
 	for i, target in enumerate(var.ss_data_list):
 		var.script += 'data' + str(i) + ' w l lw 2 lt ' + str(i+1) + ' ti "rate: ' + (target.split('.')[0]).split('_')[2] + '", \\\n'
-	var.script += 'f(x,1) w l lw 2 lt 10 ti "Affin", \\\nf(x,f1) w l lw 2 lt 11 ti "Q. Pht.", \\\nf(x,f2) w l lw 2 lt 12 ti "Phantom"'
+	var.script += 'a(x) w l lw 2 lt 10 ti "Affin", \\\np(x) w l lw 2 lt 12 ti "Phantom"'
 	var.script += '\n\nreset'
 	return
 
@@ -186,7 +186,7 @@ def script_content2(target):
 	script += 'data = "' + target + '"\n'
 	script += 'set output "MR_' + target.split('.')[0] + '.png"\n\n'
 	script += 'set key left\nset size square\n'
-	script += '#set xrange [0:1]\n#set yrange [0.:0.1]\n#set xtics 0.5\n#set ytics 0.02\n'
+	script += 'set xrange [0:1]\n#set yrange [0.:0.1]\n#set xtics 0.5\n#set ytics 0.02\n'
 	script += 'set xlabel "1/{/Symbol l}"\nset ylabel "{/Symbol s}/({/Symbol l}-1/{/Symbol l}^2)"\n\n'
 	script += '## Fit Range\n\nlow = 0.3\nhigh = 0.6\n\n'
 	script += 'fit [low:high] a*x+b data usi ( 1/$1 ):( $2/( $1 - 1/( $1**2 ) ) ) via a,b\n\n'

@@ -210,7 +210,7 @@ def plot_ss():
 # スクリプトの中身
 def script_content():
 	var.script = 'set term pngcairo font "Arial,14"\n\n'
-	var.script += '#set mono\nset colorsequence classic\n\n'
+	var.script += '#set mono\n#set colorsequence classic\n\n'
 	var.script += 'data = "SS.dat"\n'
 	var.script += 'set output "CyclicDeform.png"\n\n'
 	var.script += 'set key left\nset size square\n'
@@ -218,21 +218,20 @@ def script_content():
 	var.script += 'set xlabel "Strain"\nset ylabel "Stress"\n\n'
 	var.script += 'G=' + str(var.nu) + '\nfunc=' + str(var.func) + '\n'
 	if var.cyc_def_mode == 'stretch':
-		var.script += 'f(x,f)=f*G*(x-1./x**2.)\n'
-		var.script += '#f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
-		var.script += '#for shear uncomment and use 2nd eq\n'
+		var.script += 'a(x)=G*(x-1./x**2.)\n'
+		var.script += 'p(x)=G*(1.-2./func)*(x-1./x**2.)\n\n' 
 	elif var.cyc_def_mode == 'shear':
-		var.script += 'f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
-	var.script += 'f1=(func-1.)/(func+1.)\nf2=1.-2./func\n\n'
+		var.script += 'a(x)=2*G*x\n'
+		var.script += 'p(x)=2*G*(1.-2./func)*x\n\n'
 	var.script += 'plot '
 	for i in range(len(var.ss_data)):
 		var.script += 'data ind ' + str(i) + ' w l lw 2 lt ' + str(i+1) + ' ti "#' + str(i) + '", \\\n'
 	var.script += 'data ind ' + str(i+1) + ' w l lw 4 lt ' + str(i+2) + ' ti "average", \\\n'
-	var.script += 'f(x,1) w l lw 2 lt 10 ti "Affin", \\\nf(x,f1) w l lw 2 lt 11 ti "Q. Pht.", \\\nf(x,f2) w l lw 2 lt 12 ti "Phantom"'
+	var.script += 'a(x) w l lw 2 lt 10 ti "Affin", \\\np(x) w l lw 2 lt 12 ti "Phantom"'
 	var.script += '\n\nreset\n\n'
 	#
 	var.script += 'set term pngcairo font "Arial,14"\n\n'
-	var.script += '#set mono\nset colorsequence classic\n\n'
+	var.script += '#set mono\n#set colorsequence classic\n\n'
 	var.script += 'data = "SS.dat"\n'
 	var.script += 'set output "Smoothed.png"\n\n'
 	var.script += 'set key left\nset size square\n'
@@ -240,16 +239,15 @@ def script_content():
 	var.script += 'set xlabel "Strain"\nset ylabel "Stress"\n\n'
 	var.script += 'G=' + str(var.nu) + '\nfunc=' + str(var.func) + '\n'
 	if var.cyc_def_mode == 'stretch':
-		var.script += 'f(x,f)=f*G*(x-1./x**2.)\n'
-		var.script += '#f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
-		var.script += '#for shear uncomment and use 2nd eq\n'
+		var.script += 'a(x)=G*(x-1./x**2.)\n'
+		var.script += 'p(x)=G*(1.-2./func)*(x-1./x**2.)\n\n' 
 	elif var.cyc_def_mode == 'shear':
-		var.script += 'f(x,f)=f*G*((x+1)-1./(x+1)**2.)\n'
-	var.script += 'f1=(func-1.)/(func+1.)\nf2=1.-2./func\n\n'
+		var.script += 'a(x)=2*G*x\n'
+		var.script += 'p(x)=2*G*(1.-2./func)*x\n\n'
 	var.script += f'set label 1 sprintf("Hyst. Loss Ratio = %.2f", {var.hystloss:}) at graph 0.1, 0.65\n\n'
 	var.script += 'plot '
 	var.script += 'data ind ' + str(len(var.ss_data)+1) + ' w l lw 2 lt 1 ti "Smoothed", \\\n'
-	var.script += 'f(x,1) w l lw 1 lt 10 ti "Affin", \\\nf(x,f1) w l lw 1 lt 11 ti "Q. Pht.", \\\nf(x,f2) w l lw 1 lt 12 ti "Phantom"'
+	var.script += 'a(x) w l lw 2 lt 10 ti "Affin", \\\np(x) w l lw 2 lt 12 ti "Phantom"'
 	var.script += '\n\nreset'
 
 	return
