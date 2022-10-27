@@ -279,7 +279,7 @@ def read_condition():
 		var.step_relaxation = u.get('StepDeformation.StepShear.ShearConditions.Relaxation[]')
 	elif var.step_deform == 'StepStretch':
 		[var.step_deform_max, var.step_rate, var.step_steps] = u.get('StepDeformation.StepStretch.StretchConditions.Deformation')
-		deform_time = (var.step_deform_max - 1)/var.step_rate
+		deform_time = abs(var.step_deform_max - 1)/var.step_rate
 		#
 		var.step_relaxation = u.get('StepDeformation.StepStretch.StretchConditions.Relaxation[]')
 	#
@@ -357,7 +357,7 @@ def setup_simple_deform():
 	return
 # 
 def set_dir():
-	var.calc_dir = var.sim_deform + '_calculation_read_' + var.read_udf.split('.')[0]
+	var.calc_dir = f"{var.sim_deform:}_calculation_read_{var.read_udf.split('.')[0]:}_until_{var.sim_deform_max:}"
 	if os.path.exists(var.calc_dir):
 		print("Use existing dir of ", var.calc_dir)
 	else:
@@ -394,7 +394,7 @@ def make_batch():
 #-----
 def make_simpledeform_udf(udf_in, rate):
 	if var.sim_deform == 'stretch':
-		deform_time = (var.sim_deform_max - 1)/rate
+		deform_time = abs(var.sim_deform_max - 1)/rate
 	elif var.sim_deform == 'shear':
 		deform_time = var.sim_deform_max/rate
 	#
@@ -420,6 +420,8 @@ def make_simpledeform_udf(udf_in, rate):
 		u.put('Cell_Deformation', 		p + 'Method')
 		u.put('Simple_Elongation', 		p + 'Cell_Deformation.Method')
 		u.put('Initial_Strain_Rate', 	p + 'Cell_Deformation.Simple_Elongation.Input_Method')
+		if var.sim_deform_max < 1.:
+			rate = -1*rate
 		u.put(rate,	 					p + 'Cell_Deformation.Simple_Elongation.Initial_Strain_Rate.Rate')
 		u.put(0.5, 						p + 'Cell_Deformation.Simple_Elongation.Poisson_Ratio')
 		u.put('z', 						p + 'Cell_Deformation.Simple_Elongation.Axis')
@@ -722,6 +724,8 @@ def make_stepdeform_udf(udf_in):
 		u.put('Simple_Elongation', 		p + 'Cell_Deformation.Method')
 		u.put('Initial_Strain_Rate', 	p + 'Cell_Deformation.Simple_Elongation.Input_Method')
 		u.put(var.step_rate,	 					p + 'Cell_Deformation.Simple_Elongation.Initial_Strain_Rate.Rate')
+		if var.step_deform_max < 1:
+			u.put(-1*var.step_rate,	 					p + 'Cell_Deformation.Simple_Elongation.Initial_Strain_Rate.Rate')
 		u.put(0.5, 						p + 'Cell_Deformation.Simple_Elongation.Poisson_Ratio')
 		u.put('z', 						p + 'Cell_Deformation.Simple_Elongation.Axis')
 		u.put(1, 						p + 'Cell_Deformation.Interval_of_Deform')

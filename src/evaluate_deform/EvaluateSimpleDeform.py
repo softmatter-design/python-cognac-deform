@@ -145,7 +145,7 @@ def script_content():
 	var.script += 'set xlabel "Strain"\nset ylabel "Stress"\n\n'
 	var.script += 'G=' + str(var.nu) + '\nfunc=' + str(var.func) + '\n'
 	if var.simple_def_mode == 'stretch':
-		var.script += 'set xrange [1:3]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n\n'
+		var.script += '#set xrange [1:3]\n#set yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n\n'
 		var.script += 'a(x)=G*(x-1./x**2.)\n'
 		var.script += 'p(x)=G*(1.-2./func)*(x-1./x**2.)\n\n' 
 	elif var.simple_def_mode == 'shear':

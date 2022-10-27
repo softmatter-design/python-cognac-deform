@@ -67,8 +67,8 @@ def calc_step_deform(t_udf):
 	stress = []
 	temp = []
 	# データ読み込み
-	prev_stress = 0.
-	prev_g = 0.
+	# prev_stress = 0.
+	# prev_g = 0.
 	for rec in range(1, uobj.totalRecord()):
 		print("Reading Rec.=", rec)
 		uobj.jump(rec)
@@ -83,15 +83,15 @@ def calc_step_deform(t_udf):
 			tmp_strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
 			tmp_stress = uobj.get('Statistics_Data.Stress.Total.Batch_Average.xy')
 			tmp_g = tmp_stress/tmp_strain
-		if tmp_stress <= 0:
-			tmp_stress = prev_stress
-			tmp_g = prev_g
+		# if tmp_stress <= 0:
+		# 	tmp_stress = prev_stress
+		# 	tmp_g = prev_g
 		strain.append(tmp_strain)
 		stress.append(tmp_stress)
 		g.append(tmp_g)
 		#
-		prev_stress = tmp_stress
-		prev_g = tmp_g
+		# prev_stress = tmp_stress
+		# prev_g = tmp_g
 	#
 	var.step_strain = tmp_strain
 	var.elapsed_time = time[-1]
@@ -138,7 +138,7 @@ def read_relax(target):
 	time = []
 	g = []
 	temp = []
-	prev_g = 0.
+	# prev_g = 0.
 	for i in range(1, uobj.totalRecord()):
 		print("Reading Rec.=", i)
 		uobj.jump(i)
@@ -153,8 +153,8 @@ def read_relax(target):
 		elif var.step_def_mode == 'shear':
 			tmp_stress = uobj.get('Statistics_Data.Stress.Total.Batch_Average.xy')
 			tmp_g = tmp_stress/var.step_strain
-		if tmp_g <=0:
-			tmp_g = prev_g
+		# if tmp_g <=0:
+		# 	tmp_g = prev_g
 		g.append(tmp_g)
 		prev_g = tmp_g
 	var.global_time.extend(time)
