@@ -93,8 +93,12 @@ def read_and_calc(target):
 		elif var.simple_def_mode == 'stretch':
 			cell = uobj.get("Structure.Unit_Cell.Cell_Size")
 			stress_list = uobj.get("Statistics_Data.Stress.Total.Batch_Average")
-			stress = (cell[0]*cell[1])*(stress_list[2]-(stress_list[0] + stress_list[1])/2.)/area_init
-			strain = uobj.get("Structure.Unit_Cell.Cell_Size.c")/z_init
+			if str(target.split("_")[3]) == 'out.udf':
+				stress = (cell[0]*cell[1])*(stress_list[2]-(stress_list[0] + stress_list[1])/2.)/area_init
+				strain = uobj.get("Structure.Unit_Cell.Cell_Size.c")/z_init
+			else:
+				stress = (cell[0]*cell[1])*(stress_list[2]-(stress_list[0] + stress_list[1])/2.)/(cell[0]*cell[1]*cell[2])**(2/3)
+				strain = uobj.get("Structure.Unit_Cell.Cell_Size.c")/(cell[0]*cell[1]*cell[2])**(1/3)
 		data.append([strain, stress])
 	return data
 
@@ -104,7 +108,10 @@ def save_data():
 	for i, target_udf in enumerate(var.sorted_udf):
 		if (len(target_udf.split('_')) > 2) and ('e' in target_udf.split('_')[2]):
 			target_rate = str(target_udf.split("_")[2])
-			target = "SS_rate_" + target_rate + '.dat'
+			if str(target_udf.split("_")[3]) == 'out.udf':
+				target = "SS_rate_" + target_rate + '.dat'
+			else:
+				target = f"SS_rate_{target_rate:}_{str(target_udf.split('_')[3])}.dat"
 		else:
 			target = 'SS_' + target_udf.split('.')[0] + '.dat'
 		var.ss_data_list.append(target)
