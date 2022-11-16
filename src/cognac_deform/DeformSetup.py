@@ -279,7 +279,10 @@ def read_condition():
 		var.step_relaxation = u.get('StepDeformation.StepShear.ShearConditions.Relaxation[]')
 	elif var.step_deform == 'StepStretch':
 		[var.step_deform_max, var.step_rate, var.step_steps] = u.get('StepDeformation.StepStretch.StretchConditions.Deformation')
-		deform_time = abs(var.step_deform_max - 1)/var.step_rate
+		if var.step_deform_max == 1.0:
+			sys.exit('\nStep Stretch Condition is not proper !!\nMax Deformation should not be 1.0 !')
+		else:
+			deform_time = abs(var.step_deform_max - 1)/var.step_rate
 		#
 		var.step_relaxation = u.get('StepDeformation.StepStretch.StretchConditions.Relaxation[]')
 	#
