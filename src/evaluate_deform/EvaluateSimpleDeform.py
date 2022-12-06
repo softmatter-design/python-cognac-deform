@@ -150,19 +150,19 @@ def script_content():
 	var.script += 'set output "SS_multi.png"\n\n'
 	var.script += 'set key left\nset size square\n'
 	var.script += 'set xlabel "Strain"\nset ylabel "Stress"\n\n'
-	var.script += 'G=' + str(var.nu) + '\nfunc=' + str(var.func) + '\n'
+	var.script += 'G=' + str(var.nu) + '\nfunc=' + str(var.func) + '\nm=1.5\n'
 	if var.simple_def_mode == 'stretch':
 		var.script += '#set xrange [1:3]\n#set yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n\n'
-		var.script += 'a(x)=G*(x-1./x**2.)\n'
-		var.script += 'p(x)=G*(1.-2./func)*(x-1./x**2.)\n\n' 
+		var.script += 'p(x)=G*(1.-2./func)*(x-1./x**2.)\n' 
+		var.script += 'g(x)=m*p(x)\n\n'
 	elif var.simple_def_mode == 'shear':
-		var.script += 'set xrange [0:2]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
-		var.script += 'a(x)=2*G*x\n'
-		var.script += 'p(x)=2*G*(1.-2./func)*x\n\n'
+		var.script += 'set xrange [0:1]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
+		var.script += 'p(x)=G*(1.-2./func)*x\n\n'
+		var.script += 'g(x)=m*p(x)\n\n'
 	var.script += 'plot	'
 	for i, target in enumerate(var.ss_data_list):
 		var.script += 'data' + str(i) + ' w l lw 2 lt ' + str(i+1) + ' ti "rate: ' + (target.split('.')[0]).split('_')[2] + '", \\\n'
-	var.script += 'a(x) w l lw 2 lt 10 ti "Affin", \\\np(x) w l lw 2 lt 12 ti "Phantom"'
+	var.script += 'g(x) w l lw 2 lt 6 ti "g=1.5", \\\np(x) w l lw 2 lt 7 ti "Phantom"'
 	var.script += '\n\nreset'
 	return
 
