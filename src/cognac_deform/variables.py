@@ -58,5 +58,6 @@ nu = 0.1
 
 
 # 計算で使用するディレクトリ
+title_name = ''
 calc_dir = ""
 batch = ''

@@ -361,6 +361,8 @@ def setup_simple_deform():
 # 
 def set_dir():
 	var.calc_dir = f"{var.sim_deform:}_calculation_read_{var.read_udf.split('.')[0]:}_until_{var.sim_deform_max:}"
+	c_dir = os.getcwd().split('\\')[-1]
+	var.title_name = str(c_dir.split('_', 2)[-1]) + f"{var.sim_deform:}_calculation_until_{var.sim_deform_max:}"
 	if os.path.exists(var.calc_dir):
 		print("Use existing dir of ", var.calc_dir)
 	else:
@@ -386,7 +388,7 @@ def make_batch():
 		elif var.sim_deform == 'shear':
 			uin = 'Shear_rate_' + rate_str + "_uin.udf"
 		# 
-		make_title("Calculating rate_" + rate_str)
+		make_title(var.title_name + "_Calculating rate_" + rate_str)
 		var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(var.core) +' \n'
 		var.batch += f'evaluate_simple_deform -f {str(var.func):} -n {str(var.nu):} -m {var.sim_deform:} \n'
 		udf_in =  os.path.join(var.calc_dir, uin)
@@ -518,7 +520,7 @@ def make_cycle_batch(id):
 #
 def make_cycle():
 	for var.cyc_direction in ['_Forward', '_Backward']:
-		make_title("Calculating_Cycle_until_" + str(var.cyc_def_max).replace('.', '_') + "_rate_" + f"{var.cyc_rate:.1e}".replace('.','_') + '_#' + str(var.cyc_count) + var.cyc_direction)
+		make_title(var.title_name + "_Calculating_Cycle_until_" + str(var.cyc_def_max).replace('.', '_') + "_rate_" + f"{var.cyc_rate:.1e}".replace('.','_') + '_#' + str(var.cyc_count) + var.cyc_direction)
 		# UDFファイル名を設定
 		uin = '#' +str(var.cyc_count) + var.cyc_direction + "_uin.udf"
 		uout = uin.replace("uin", "out")
@@ -681,7 +683,7 @@ def set_udf_batch(rotate):
 	# UDFファイル名を設定
 	base = f'{var.step_deform}_until_' + f'{var.step_deform_max:.1e}'.replace('.', '_') + '_rate_' + f'{var.step_rate:.1e}'.replace('.', '_') + f'_{rotate}'
 	#
-	make_title(base+"_deform")
+	make_title(var.title_name + '_' + base + "_deform")
 	uin = 'deform_uin.udf'
 	var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(var.core) +' \n'
 	udf_in =  os.path.join(var.calc_dir, uin)
@@ -689,7 +691,7 @@ def set_udf_batch(rotate):
 	prev_udf = uin.replace("uin", "out")
 	#
 	for i, condition in enumerate(var.step_relaxation):
-		make_title(base+f'_relaxation_{i}')
+		make_title(var.title_name + '_' + base + f'_relaxation_{i}')
 		uin = f'relaxation_{i}_uin.udf'
 		var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(var.core) +' \n'
 		udf_in =  os.path.join(var.calc_dir, uin)
