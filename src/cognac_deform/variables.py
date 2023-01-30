@@ -16,8 +16,12 @@ sim_time_div = 0.01
 simple_def_mode = ''
 sim_deform = ''
 sim_rate_list = []
+sim_rate = ''
 sim_deform_max = 1
 sim_resolution = 0.
+sim_basedir = ''
+sim_ratedir = ''
+sim_dirlist = []
 
 # Cyclic deformation
 cyclic_deform = ''
@@ -58,6 +62,7 @@ nu = 0.1
 
 
 # 計算で使用するディレクトリ
+title_base = ''
 title_name = ''
 calc_dir = ""
 batch = ''

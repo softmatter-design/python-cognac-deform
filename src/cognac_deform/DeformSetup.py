@@ -348,63 +348,128 @@ def setup():
 def setup_simple_deform():
 	if var.simple_def_mode == 'both':
 		for var.sim_deform in ['shear', 'stretch']:
-			# 計算用のディレクトリーを作成
-			set_dir()
-			# ファイル名を設定し、バッチファイルを作成
-			make_batch()
+			set_simple_eachrate()
 	else:
-		# 計算用のディレクトリーを作成
-		set_dir()
-		# ファイル名を設定し、バッチファイルを作成
-		make_batch()
+		set_simple_eachrate()
 	return
-# 
-def set_dir():
-	var.calc_dir = f"{var.sim_deform:}_calculation_read_{var.read_udf.split('.')[0]:}_until_{var.sim_deform_max:}"
+
+
+def set_simple_eachrate():
+	var.sim_basedir = f"{var.sim_deform:}_calculation_read_{var.read_udf.split('.')[0]:}_until_{var.sim_deform_max:}"
+	if os.path.exists(var.sim_basedir):
+		print("Use existing dir of ", var.sim_basedir)
+	else:
+		print("Make new dir of ", var.sim_basedir)
+		os.makedirs(var.sim_basedir)
+
 	c_dir = os.getcwd().split('\\')[-1]
-	var.title_name = str(c_dir.split('_', 2)[-1]) + f"{var.sim_deform:}_calculation_until_{var.sim_deform_max:}"
+	var.title_base = str(c_dir.split('_', 2)[-1]) + f"_{var.sim_deform:}_calculation_until_{var.sim_deform_max:}_"
+
+	make_batch_series([f'rate_{rate:4.0e}' for rate in var.sim_rate_list], var.sim_basedir, '_calc_all.bat', '')
+
+	for var.sim_rate in var.sim_rate_list:
+		var.sim_ratedir = os.path.join(var.sim_basedir, f"rate_{var.sim_rate:4.0e}")
+		#
+		if os.path.exists(var.sim_ratedir):
+			print("Use existing dir of ", var.sim_ratedir)
+		else:
+			print("Make new dir of ", var.sim_ratedir)
+			os.makedirs(var.sim_ratedir)
+		#
+		set_rotation_simple()
+
+	return
+
+def set_rotation_simple():
+	if var.sim_deform == 'shear':
+		var.step_rotate = ['base', 'x', 'y', 'z']
+	elif var.sim_deform == 'stretch':
+		var.step_rotate = ['base', 'x', 'y']
+	
+	make_batch_series(['rotate_' + dir for dir in var.step_rotate], var.sim_ratedir, '_deform.bat', '')
+
+	for rotate in var.step_rotate:
+		set_rotate_dir_sim(rotate)
+		set_udf_batch_sim(rotate)
+	return
+
+def set_rotate_dir_sim(rotate):
+	tmp_dir = f'rotate_{rotate}'
+	var.title_name = var.title_base + f"rate_{var.sim_rate:4.0e}" + f'_rotate_{rotate}'
+	var.sim_dirlist.append(tmp_dir)
+	var.calc_dir = os.path.join(var.sim_ratedir, tmp_dir)
 	if os.path.exists(var.calc_dir):
 		print("Use existing dir of ", var.calc_dir)
 	else:
 		print("Make new dir of ", var.calc_dir)
 		os.makedirs(var.calc_dir)
-	#
+
 	var.base_udf = os.path.join(var.calc_dir, 'base.udf')
 	u = UDFManager(var.read_udf)
 	u.jump(1)
 	u.eraseRecord(record_pos=0, record_num=u.totalRecord()-1)
+	if rotate != 'base':
+		rotate_position_sim(u, rotate)
 	u.write(var.base_udf)
 	return
 
+# アトムのポジションを回転
+def rotate_position_sim(u, axis):
+	R = rotate_sim(axis, np.pi/2.)
+	u.jump(u.totalRecord() - 1)
+	pos = u.get('Structure.Position.mol[].atom[]')
+	for i, mol in enumerate(pos):
+		for j, atom in enumerate(mol):
+			tmp = list(np.array(R).dot(np.array(atom)))
+			u.put(tmp, 'Structure.Position.mol[].atom[]', [i, j])
+	return
+
+def rotate_sim(axis, deg):
+	if axis == 'x':
+		R = [
+			[1., 0., 0.],
+			[0., np.cos(deg), -1*np.sin(deg)],
+			[0., np.sin(deg), np.cos(deg)]
+		]
+	elif axis == 'y':
+		R = [
+			[np.cos(deg), 0., np.sin(deg)],
+			[0., 1., 0.],
+			[-1*np.sin(deg), 0., np.cos(deg)]
+		]
+	elif axis == 'z':
+		R = [
+			[np.cos(deg), -1*np.sin(deg), 0.],
+			[np.sin(deg), np.cos(deg), 0.],
+			[0., 0., 1.]
+		]
+	return R
+
 # ファイル名を設定し、バッチファイルを作成
-def make_batch():
+def set_udf_batch_sim(rotate):
 	var.batch = "#!/bin/bash\n"
-	#
-	for rate in var.sim_rate_list:
-		# UDFファイル名を設定
-		rate_str = "{0:4.0e}".format(rate)
-		if var.sim_deform == 'stretch':
-			uin = 'Stretch_rate_' + rate_str + "_uin.udf"
-		elif var.sim_deform == 'shear':
-			uin = 'Shear_rate_' + rate_str + "_uin.udf"
-		# 
-		make_title(var.title_name + "_Calculating rate_" + rate_str)
-		var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(var.core) +' \n'
-		var.batch += f'evaluate_simple_deform -f {str(var.func):} -n {str(var.nu):} -m {var.sim_deform:} \n'
-		udf_in =  os.path.join(var.calc_dir, uin)
-		make_simpledeform_udf(udf_in, rate)
+	# UDFファイル名を設定
+	uin = f'rate_{var.sim_rate:4.0e}_uin.udf'
+	# 
+	make_title(var.title_name)
+
+	var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(var.core) +' \n'
+	var.batch += f'evaluate_simple_deform -f {str(var.func):} -n {str(var.nu):} -m {var.sim_deform:} \n'
+	udf_in =  os.path.join(var.calc_dir, uin)
+	make_simpledeform_udf(udf_in)
+
 	write_batchfile(var.calc_dir, '_deform.bat',var.batch)
 	return
 
 #-----
-def make_simpledeform_udf(udf_in, rate):
+def make_simpledeform_udf(udf_in):
 	if var.sim_deform == 'stretch':
-		deform_time = abs(var.sim_deform_max - 1)/rate
+		deform_time = abs(var.sim_deform_max - 1)/var.sim_rate
 	elif var.sim_deform == 'shear':
-		deform_time = var.sim_deform_max/rate
+		deform_time = var.sim_deform_max/var.sim_rate
 	#
 	time_total = round(deform_time/var.sim_time_div)
-	time_1_step = round(var.sim_resolution/var.sim_time_div/rate)
+	time_1_step = round(var.sim_resolution/var.sim_time_div/var.sim_rate)
 	#
 	u = UDFManager(var.base_udf)
 	# goto global data
@@ -426,8 +491,8 @@ def make_simpledeform_udf(udf_in, rate):
 		u.put('Simple_Elongation', 		p + 'Cell_Deformation.Method')
 		u.put('Initial_Strain_Rate', 	p + 'Cell_Deformation.Simple_Elongation.Input_Method')
 		if var.sim_deform_max < 1.:
-			rate = -1*rate
-		u.put(rate,	 					p + 'Cell_Deformation.Simple_Elongation.Initial_Strain_Rate.Rate')
+			var.sim_rate = -1*var.sim_rate
+		u.put(var.sim_rate,	 					p + 'Cell_Deformation.Simple_Elongation.Initial_Strain_Rate.Rate')
 		u.put(0.5, 						p + 'Cell_Deformation.Simple_Elongation.Poisson_Ratio')
 		u.put('z', 						p + 'Cell_Deformation.Simple_Elongation.Axis')
 		u.put(1, 						p + 'Cell_Deformation.Interval_of_Deform')
@@ -436,7 +501,7 @@ def make_simpledeform_udf(udf_in, rate):
 		p = "Simulation_Conditions.Dynamics_Conditions.Deformation."
 		u.put('Lees_Edwards', 	p + 'Method')
 		u.put('Steady', 		p + 'Lees_Edwards.Method')
-		u.put(rate, 			p + 'Lees_Edwards.Steady.Shear_Rate')
+		u.put(var.sim_rate, 			p + 'Lees_Edwards.Steady.Shear_Rate')
 	
 	# Output_Flags
 	u.put([1, 1, 1], 'Simulation_Conditions.Output_Flags.Structure')
@@ -466,7 +531,7 @@ def setup_cyclic_deform():
 	set_each_cycle()
 	#
 	option = ''
-	make_batch_series(var.cyc_dirlist, var.cyc_dir, option)
+	make_batch_series(var.cyc_dirlist, var.cyc_dir, '_deform.bat', option)
 	return
 
 def set_cyclic_basedir():
@@ -598,18 +663,19 @@ def setup_step_deform():
 	# 計算用のディレクトリーを作成
 	set_step_basedir()
 	# 
-	set_eachstep()
+	set_rotation_step()
 	#
 	if var.step_deform == 'StepStretch':
 		option = f'evaluate_step_deform -f {var.func} -n {var.nu} -m stretch -a\n'
 	elif var.step_deform == 'StepShear':
 		option = f'evaluate_step_deform -f {var.func} -n {var.nu} -m shear -a\n'
-	make_batch_series(var.step_dirlist, var.step_dir, option)
+	make_batch_series(var.step_dirlist, var.step_dir, '_deform.bat', option)
 	return
 	
 # 
 def set_step_basedir():
 	var.step_dir = f'{var.step_deform:}_until_' + f'{var.step_deform_max:.1f}'.replace('.','_') + '_rate_' + f'{var.step_rate:.1e}'.replace('.', '_') + f'_read_{var.read_udf.split(".")[0]:}'
+
 	if os.path.exists(var.step_dir):
 		print("Use existing dir of ", var.step_dir)
 	else:
@@ -617,7 +683,7 @@ def set_step_basedir():
 		os.makedirs(var.step_dir)
 	return
 
-def set_eachstep():
+def set_rotation_step():
 	if var.step_deform == 'StepShear':
 		var.step_rotate = ['base', 'x', 'y', 'z']
 	elif var.step_deform == 'StepStretch':
@@ -815,16 +881,16 @@ def write_batchfile(dir, filename, batch_file):
 
 #######################################
 # サブディレクトリを使うバッチファイルを作成
-def make_batch_series(subdir_list, dir, option):
+def make_batch_series(subdir_list, dir, target_bat, option):
 	batch_series = ''
 	for subdir in subdir_list:
 		if platform.system() == "Windows":
 			batch_series += 'cd /d %~dp0\\' + subdir +'\n'
-			batch_series += 'call _deform.bat\n'
+			batch_series += 'call ' + target_bat + '\n'
 			batch_series += 'cd /d %~dp0\n'
 		elif platform.system() == "Linux":
 			batch_series += 'cd ./' + subdir +'\n'
-			batch_series += './_deform.bat\n'
+			batch_series += './' + target_bat + '\n'
 			batch_series += 'cd ../\n'
 		if option != '':
 			batch_series += option
