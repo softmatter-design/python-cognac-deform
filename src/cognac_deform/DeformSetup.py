@@ -382,7 +382,7 @@ def set_simple_eachrate():
 
 def set_rotation_simple():
 	if var.sim_deform == 'shear':
-		var.step_rotate = ['base', 'x', 'y', 'z']
+		var.step_rotate = ['base', 'x', 'y', 'z', 'yx', 'zx']
 	elif var.sim_deform == 'stretch':
 		var.step_rotate = ['base', 'x', 'y']
 	
@@ -420,7 +420,7 @@ def rotate_position_sim(u, axis):
 	pos = u.get('Structure.Position.mol[].atom[]')
 	for i, mol in enumerate(pos):
 		for j, atom in enumerate(mol):
-			tmp = list(np.array(R).dot(np.array(atom)))
+			tmp = list(np.dot(np.array(R), np.array(atom)))
 			u.put(tmp, 'Structure.Position.mol[].atom[]', [i, j])
 	return
 
@@ -443,6 +443,30 @@ def rotate_sim(axis, deg):
 			[np.sin(deg), np.cos(deg), 0.],
 			[0., 0., 1.]
 		]
+	elif axis == 'yx':
+		Ry = [
+			[np.cos(deg), 0., np.sin(deg)],
+			[0., 1., 0.],
+			[-1*np.sin(deg), 0., np.cos(deg)]
+		]
+		Rx = [
+			[1., 0., 0.],
+			[0., np.cos(deg), -1*np.sin(deg)],
+			[0., np.sin(deg), np.cos(deg)]
+		]
+		R = list(np.dot(np.array(Rx), np.array(Ry)))
+	elif axis == 'zx':
+		Rz = [
+			[np.cos(deg), -1*np.sin(deg), 0.],
+			[np.sin(deg), np.cos(deg), 0.],
+			[0., 0., 1.]
+		]
+		Rx = [
+			[1., 0., 0.],
+			[0., np.cos(deg), -1*np.sin(deg)],
+			[0., np.sin(deg), np.cos(deg)]
+		]
+		R = list(np.dot(np.array(Rx), np.array(Rz)))
 	return R
 
 # ファイル名を設定し、バッチファイルを作成
@@ -719,7 +743,7 @@ def rotate_position(u, axis):
 	pos = u.get('Structure.Position.mol[].atom[]')
 	for i, mol in enumerate(pos):
 		for j, atom in enumerate(mol):
-			tmp = list(np.array(R).dot(np.array(atom)))
+			tmp = list(np.dot(np.array(R), np.array(atom)))
 			u.put(tmp, 'Structure.Position.mol[].atom[]', [i, j])
 	return
 
