@@ -15,23 +15,25 @@ import evaluate_deform.variables as var
 # print("This is module!")
 ###########################################################
 def simple_deform():
-	setup()
-	calc_stress_all()
-	save_data()
-	plot()
+	read_arg()
+	if var.f_aaverage:
+		average()
+		plot_ave()
+	else:
+		file_listing()
+		calc_stress_all()
+		save_data()
+		plot()
 	return
 
 ##############
-def setup():
-	read_arg()
-	file_listing()
-	return
 # Read argument 
 def read_arg():
 	parser = argparse.ArgumentParser(description='Evaluate deformed simulations !')
 	parser.add_argument('-f','--func', type=int, help="Functionality of junction point (int).")
 	parser.add_argument('-n', '--nu', type=float, help="Strand density of network (float).")
 	parser.add_argument('-m', '--mode', help="Mode of deformation; shear or stretch")
+	parser.add_argument('-a', '--average', help="Average multi data of different deformation", action='store_true')
 	args = parser.parse_args()
 	if args.func and args.nu:
 		var.func = args.func
@@ -45,6 +47,8 @@ def read_arg():
 	else:
 		print('\n#####\ndeformation mode is not set!')
 		print('according to file name(shear or stretch), evaluation mode  will be set!')
+	if args.average:
+		var.f_aaverage = True
 	return
 # File Select
 def file_listing():
@@ -116,7 +120,7 @@ def save_data():
 			target = 'SS_' + target_udf.split('.')[0] + '.dat'
 		var.ss_data_list.append(target)
 		with open(target,'w') as f:
-			f.write('# Strain\tStress\n\n')
+			# f.write('# Strain\tStress\n\n')
 			for line in var.ss_data[i]:
 				f.write(str(line[0]) + '\t' + str(line[1]) + '\n')
 	return
@@ -206,17 +210,53 @@ def script_content2(target):
 
 	return script
 
+#####
+# average
+def average():
+	dat_list = glob.glob('./*/SS*.dat')
+	gathered = []
+	for file in dat_list:
+		with open(file, 'r') as f:
+			for line in f.readlines():
+				if line[0] not in ['#', '', '\n']:
+					gathered.append(line)
+	with open('all.dat', 'w') as f:
+		for line in gathered:
+			f.write(line)
+	return
+#####
+# plot average
+def plot_ave():
+	script_ave()
+	with open('plot_all.plt', 'w') as f:
+		f.write(var.script)
+	#
+	if platform.system() == "Windows":
+		subprocess.call(['plot_all.plt'], shell=True)
+	elif platform.system() == "Linux":
+		subprocess.call(['gnuplot ' + 'plot_all.plt'], shell=True)
+	return
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+# スクリプトの中身
+def script_ave():
+	var.script = 'set term pngcairo font "Arial,14"\n\n'
+	var.script += '#set mono\nset colorsequence classic\n\n'
+	var.script += 'data = "all.dat"\n'
+	var.script += 'set output "averaged.png"\n\n'
+	var.script += 'set key left\nset size square\n'
+	var.script += 'set xlabel "Strain"\nset ylabel "Stress"\n\n'
+	var.script += 'G=' + str(var.nu) + '\nfunc=' + str(var.func) + '\nm=1.5\n'
+	if var.simple_def_mode == 'stretch':
+		var.script += '#set xrange [1:3]\n#set yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n\n'
+		var.script += 'p(x)=G*(1.-2./func)*(x-1./x**2.)\n' 
+		var.script += 'g(x)=m*p(x)\n\n'
+	elif var.simple_def_mode == 'shear':
+		var.script += '#set xrange [0:1]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
+		var.script += 'p(x)=G*(1.-2./func)*x\n\n'
+		var.script += 'g(x)=m*p(x)\n\n'
+	var.script += 'plot	'
+	var.script += 'data lc rgb "gray" ti "raw data", \\\n'
+	var.script += 'data smooth unique w l lw 2 lt 1 ti "averaged", \\\n'
+	var.script += 'g(x) w l lw 2 lt 6 ti "g=1.5", \\\np(x) w l lw 2 lt 7 ti "Phantom"'
+	var.script += '\n\nreset'
+	return
