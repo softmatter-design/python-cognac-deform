@@ -611,7 +611,7 @@ def make_cycle():
 	for var.cyc_direction in ['_Forward', '_Backward']:
 		make_title(var.title_name + "_Calculating_Cycle_until_" + str(var.cyc_def_max).replace('.', '_') + "_rate_" + f"{var.cyc_rate:.1e}".replace('.','_') + '_#' + str(var.cyc_count) + var.cyc_direction)
 		# UDFファイル名を設定
-		uin = '#' +str(var.cyc_count) + var.cyc_direction + "_uin.udf"
+		uin = 'No_' +str(var.cyc_count) + var.cyc_direction + "_uin.udf"
 		uout = uin.replace("uin", "out")
 		var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uout + ' -n ' + str(var.core) +' \n'
 		
