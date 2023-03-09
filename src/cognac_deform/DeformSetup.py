@@ -709,7 +709,7 @@ def set_step_basedir():
 
 def set_rotation_step():
 	if var.step_deform == 'StepShear':
-		var.step_rotate = ['base', 'x', 'y', 'z']
+		var.step_rotate = ['base', 'x', 'y', 'z', 'yx', 'zx']
 	elif var.step_deform == 'StepStretch':
 		var.step_rotate = ['base', 'x', 'y']
 	for rotate in var.step_rotate:
@@ -766,6 +766,30 @@ def rotate(axis, deg):
 			[np.sin(deg), np.cos(deg), 0.],
 			[0., 0., 1.]
 		]
+	elif axis == 'yx':
+		Ry = [
+			[np.cos(deg), 0., np.sin(deg)],
+			[0., 1., 0.],
+			[-1*np.sin(deg), 0., np.cos(deg)]
+		]
+		Rx = [
+			[1., 0., 0.],
+			[0., np.cos(deg), -1*np.sin(deg)],
+			[0., np.sin(deg), np.cos(deg)]
+		]
+		R = list(np.dot(np.array(Rx), np.array(Ry)))
+	elif axis == 'zx':
+		Rz = [
+			[np.cos(deg), -1*np.sin(deg), 0.],
+			[np.sin(deg), np.cos(deg), 0.],
+			[0., 0., 1.]
+		]
+		Rx = [
+			[1., 0., 0.],
+			[0., np.cos(deg), -1*np.sin(deg)],
+			[0., np.sin(deg), np.cos(deg)]
+		]
+		R = list(np.dot(np.array(Rx), np.array(Rz)))
 	return R
 
 def set_udf_batch(rotate):
