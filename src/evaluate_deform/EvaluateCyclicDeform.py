@@ -73,6 +73,7 @@ def calc_stress_all():
 			tmp_data.extend(read_and_calc(target))
 		var.ss_data.append(tmp_data)
 	return
+
 # Read Data
 def read_and_calc(target):
 	uobj = UDFManager(target)
@@ -96,6 +97,8 @@ def read_and_calc(target):
 			tmp_strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
 			if tmp_strain >= 0:
 				strain = tmp_strain
+				if strain > var.cyc_deform_max:
+					var.cyc_deform_max = strain
 			else:
 				strain = float(var.cyc_deform_max) + tmp_strain
 			# if target.split('_')[1] == 'Forward':
@@ -110,8 +113,8 @@ def read_and_calc(target):
 
 		data.append([str(strain), stress])
 	#
-	if var.cyc_def_mode == 'shear' and target.split('_')[1] == 'Forward':
-		var.cyc_deform_max = strain
+	# if var.cyc_def_mode == 'shear' and target.split('_')[1] == 'Forward':
+	# 	var.cyc_deform_max = strain
 	return data
 
 ##########################
