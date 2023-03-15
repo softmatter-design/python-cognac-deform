@@ -266,7 +266,7 @@ def read_condition():
 	elif var.cyclic_deform == 'CyclicShear':
 		tmp = u.get('CycleDeformation.CyclicShear.ShearConditions[]')
 	for data in tmp:
-		var.cyc_deform_max.append(data[0])
+		var.cyc_deform_max_list.append(data[0])
 		var.cyc_repeat.append(data[1])
 		var.cyc_ratelist.append(data[2])
 		var.cyc_resolution.append(data[3])
@@ -309,9 +309,9 @@ def init_calc():
 		text += "################################################" + "\n"
 	if var.cyclic_deform != 'none':
 		text += "Cyclic Deform mode:\t\t\t" + str(var.cyclic_deform) + "\n"
-		for i in range(len(var.cyc_deform_max)):
+		for i in range(len(var.cyc_deform_max_list)):
 			text += f'Cyclic condition #{i}\n'
-			text += f"\tMaximum Strain:\t\t\t{var.cyc_deform_max[i]:.1f}\n"
+			text += f"\tMaximum Strain:\t\t\t{var.cyc_deform_max_list[i]:.1f}\n"
 			text += f"\tRepeat:\t\t\t\t{var.cyc_repeat[i]}\n"
 			text += "\tCyclic Deform Rate:\t" + ', '.join([f"{x:.1e}" for x in var.cyc_ratelist[i]]) + "\n"
 			text += "\tResolution:\t\t\t" + str(round(var.cyc_resolution[i], 4)) + "\n"
@@ -556,6 +556,9 @@ def setup_cyclic_deform():
 	#
 	option = ''
 	make_batch_series(var.cyc_dirlist, var.cyc_dir, '_deform.bat', option)
+
+	var.batch3 += 'cyclic_deform.py -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m shear\n'
+	write_batchfile(var.calc_dir, 'eval.sh', var.batch3)
 	return
 
 def set_cyclic_basedir():
@@ -568,68 +571,166 @@ def set_cyclic_basedir():
 	return
 #
 def set_each_cycle():
-	for id, var.cyc_def_max in enumerate(var.cyc_deform_max):
-		for var.cyc_rate in var.cyc_ratelist[id]:
+	for id, cyc_def_max in enumerate(var.cyc_deform_max_list):
+		for cyc_rate in var.cyc_ratelist[id]:
 			var.batch = "#!/bin/bash\n"
-			set_cyclic_dir()
-			make_cycle_batch(id)
-			# バッチファイルを作成
-			write_batchfile(var.calc_dir, '_deform.bat', var.batch)
+			var.batch2 = '#PJM -L "node=1 "\n'
+			var.batch2 += '#PJM -L "rscgrp=small "\n'
+			var.batch2 += '#PJM -L "elapse=72:00:00"\n'
+			var.batch2 += '#PJM -g hp220245\n'
+			var.batch2 += '#PJM -x PJM_LILO_GFSCACHE=/vol0004\n'
+			var.batch2 += '#PJM -S\n'
+			var.batch2 += 'export UDF_DEF_PATH="/vol0400/data/hp220245/octa/OCTA84/ENGINES/udf"\n'
+			var.batch2 += 'COGNAC="/vol0400/data/hp220245/octa/OCTA84/ENGINES/bin/unknown/cognac112"\n\n'
+
+			set_cyclic_dir(cyc_def_max, cyc_rate, id)
+
 	return
 # 
-def set_cyclic_dir():
-	tmp_dir = 'Deform_until_' + str(var.cyc_def_max).replace('.', '_') + "_rate_" + f"{var.cyc_rate:.1e}".replace('.', '_')
-	var.cyc_dirlist.append(tmp_dir)
-	var.calc_dir = os.path.join(var.cyc_dir, tmp_dir)
+def set_cyclic_dir(cyc_def_max, cyc_rate, id):
+	cond_dir = 'Deform_until_' + str(cyc_def_max).replace('.', '_') + "_rate_" + f"{cyc_rate:.1e}".replace('.', '_')
+	middle_dir = os.path.join(var.cyc_dir, cond_dir)
+	if os.path.exists(middle_dir):
+		print("Use existing dir of ", middle_dir)
+	else:
+		print("Make new dir of ", middle_dir)
+		os.makedirs(middle_dir)
+
+	set_cyclic_rotation(middle_dir, cyc_def_max, cyc_rate, id)
+
+	return
+
+def set_cyclic_rotation(middle_dir, cyc_def_max, cyc_rate, id):
+	if var.cyclic_deform == 'CyclicShear':
+		var.cyc_rotate = ['base', 'x', 'y', 'z', 'yx', 'zx']
+	elif var.cyclic_deform == 'CyclicStretch':
+		var.cyc_rotate = ['base', 'x', 'y']
+	for rotate in var.cyc_rotate:
+		set_cyc_rotate_dir(middle_dir, rotate, cyc_def_max, cyc_rate, id)
+		# set_cyc_udf_batch(rotate)
+	return
+
+def set_cyc_rotate_dir(middle_dir, rotate, cyc_def_max, cyc_rate, id):
+	tmp_dir = f'rotate_{rotate}'
+
+	# var.cyc_dirlist.append(tmp_dir)
+	var.calc_dir = os.path.join(middle_dir, tmp_dir)
 	if os.path.exists(var.calc_dir):
 		print("Use existing dir of ", var.calc_dir)
 	else:
 		print("Make new dir of ", var.calc_dir)
 		os.makedirs(var.calc_dir)
-	#
 	var.base_udf = os.path.join(var.calc_dir, 'base.udf')
 	u = UDFManager(var.read_udf)
 	u.jump(1)
-	var.system_size = float(u.get('Structure.Unit_Cell.Cell_Size.c'))
 	u.eraseRecord(record_pos=0, record_num=u.totalRecord()-1)
+	if rotate != 'base':
+		rotate_position(u, rotate)
 	u.write(var.base_udf)
-	var.cyc_readudf = 'base.udf'
+
+	make_cycle_batch(cyc_def_max, cyc_rate, id)
+
 	return
 
+# アトムのポジションを回転
+def rotate_position(u, axis):
+	R = rotate(axis, np.pi/2.)
+	u.jump(u.totalRecord() - 1)
+	pos = u.get('Structure.Position.mol[].atom[]')
+	for i, mol in enumerate(pos):
+		for j, atom in enumerate(mol):
+			tmp = list(np.dot(np.array(R), np.array(atom)))
+			u.put(tmp, 'Structure.Position.mol[].atom[]', [i, j])
+	return
+
+def rotate(axis, deg):
+	if axis == 'x':
+		R = [
+			[1., 0., 0.],
+			[0., np.cos(deg), -1*np.sin(deg)],
+			[0., np.sin(deg), np.cos(deg)]
+		]
+	elif axis == 'y':
+		R = [
+			[np.cos(deg), 0., np.sin(deg)],
+			[0., 1., 0.],
+			[-1*np.sin(deg), 0., np.cos(deg)]
+		]
+	elif axis == 'z':
+		R = [
+			[np.cos(deg), -1*np.sin(deg), 0.],
+			[np.sin(deg), np.cos(deg), 0.],
+			[0., 0., 1.]
+		]
+	elif axis == 'yx':
+		Ry = [
+			[np.cos(deg), 0., np.sin(deg)],
+			[0., 1., 0.],
+			[-1*np.sin(deg), 0., np.cos(deg)]
+		]
+		Rx = [
+			[1., 0., 0.],
+			[0., np.cos(deg), -1*np.sin(deg)],
+			[0., np.sin(deg), np.cos(deg)]
+		]
+		R = list(np.dot(np.array(Rx), np.array(Ry)))
+	elif axis == 'zx':
+		Rz = [
+			[np.cos(deg), -1*np.sin(deg), 0.],
+			[np.sin(deg), np.cos(deg), 0.],
+			[0., 0., 1.]
+		]
+		Rx = [
+			[1., 0., 0.],
+			[0., np.cos(deg), -1*np.sin(deg)],
+			[0., np.sin(deg), np.cos(deg)]
+		]
+		R = list(np.dot(np.array(Rx), np.array(Rz)))
+	return R
+
 # ファイル名を設定し、バッチファイルを作成
-def make_cycle_batch(id):
+def make_cycle_batch(cyc_def_max, cyc_rate, id):
 	for var.cyc_count in range(var.cyc_repeat[id]):
 		var.cyc_resol = var.cyc_resolution[id]
-		make_cycle()
+		make_cycle(cyc_def_max, cyc_rate)
 		if var.cyclic_deform == 'CyclicStretch':
 			var.batch += 'evaluate_cyclic_deform -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m stretch\n'
 		elif var.cyclic_deform == 'CyclicShear':
 			var.batch += 'evaluate_cyclic_deform -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m shear\n'
+	# バッチファイルを作成
+	write_batchfile(var.calc_dir, '_deform.bat', var.batch)
+	var.batch3 = '#!/bin/sh\n'
+	var.batch3 += 'cyclic_deform.py -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m shear\n'
+	write_batchfile(var.calc_dir, 'eval.sh', var.batch3)
 	return
 #
-def make_cycle():
+def make_cycle(cyc_def_max, cyc_rate):
 	for var.cyc_direction in ['_Forward', '_Backward']:
-		make_title(var.title_name + "_Calculating_Cycle_until_" + str(var.cyc_def_max).replace('.', '_') + "_rate_" + f"{var.cyc_rate:.1e}".replace('.','_') + '_#' + str(var.cyc_count) + var.cyc_direction)
+		make_title(var.title_name + "_Calculating_Cycle_until_" + str(cyc_def_max).replace('.', '_') + "_rate_" + f"{cyc_rate:.1e}".replace('.','_') + '_#' + str(var.cyc_count) + var.cyc_direction)
 		# UDFファイル名を設定
 		uin = 'No_' +str(var.cyc_count) + var.cyc_direction + "_uin.udf"
 		uout = uin.replace("uin", "out")
 		var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uout + ' -n ' + str(var.core) +' \n'
+		var.batch2 += '${COGNAC} -I ' + uin + ' -O ' + uout + ' -n 48 \n'
 		
 		udf_in =  os.path.join(var.calc_dir, uin)
-		mod_cycle_udf(udf_in)
+		
+		mod_cycle_udf(cyc_def_max, cyc_rate, udf_in)
 		var.cyc_readudf = uout
+		# バッチファイルを作成
+		write_batchfile(var.calc_dir, 'No_' +str(var.cyc_count) + var.cyc_direction + ".sh", var.batch2)
 	return
 
 #-----
-def mod_cycle_udf(udf_in):
+def mod_cycle_udf(cyc_def_max, cyc_rate, udf_in):
 	if var.cyclic_deform == 'CyclicStretch':
-		deform_time = (var.cyc_def_max - 1)/var.cyc_rate
-		speed = var.cyc_rate*var.system_size
+		deform_time = (cyc_def_max - 1)/cyc_rate
+		speed = cyc_rate*var.system_size
 	elif var.cyclic_deform == 'CyclicShear':
-		deform_time = var.cyc_def_max/var.cyc_rate
+		deform_time = cyc_def_max/cyc_rate
 	#
 	time_total = round(deform_time/var.sim_time_div)
-	time_1_step = round(var.cyc_resol/var.sim_time_div/var.cyc_rate)
+	time_1_step = round(var.cyc_resol/var.sim_time_div/cyc_rate)
 	#
 	u = UDFManager(var.base_udf)
 	# goto global data
@@ -662,9 +763,9 @@ def mod_cycle_udf(udf_in):
 		u.put('Lees_Edwards', 	p + 'Method')
 		u.put('Steady', 		p + 'Lees_Edwards.Method')
 		if var.cyc_direction == '_Forward':
-			u.put(var.cyc_rate, 		p + 'Lees_Edwards.Steady.Shear_Rate')
+			u.put(cyc_rate, 		p + 'Lees_Edwards.Steady.Shear_Rate')
 		else:
-			u.put(-1.*var.cyc_rate, 	p + 'Lees_Edwards.Steady.Shear_Rate')
+			u.put(-1.*cyc_rate, 	p + 'Lees_Edwards.Steady.Shear_Rate')
 	# Output_Flags
 	u.put([1, 1, 1], 'Simulation_Conditions.Output_Flags.Structure')
 	# Read_Set_of_Molecules

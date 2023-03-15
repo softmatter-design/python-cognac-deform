@@ -25,7 +25,7 @@ sim_dirlist = []
 
 # Cyclic deformation
 cyclic_deform = ''
-cyc_deform_max = []
+cyc_deform_max_list = []
 cyc_repeat = []
 cyc_ratelist = []
 cyc_resolution = []
@@ -33,9 +33,9 @@ cyc_resolution = []
 cyc_dir = ''
 cyc_readudf = ''
 cyc_direction = ''
+cyc_rotate = []
 cyc_dirlist = []
 
-cyc_def_max = 0
 cyc_rate = 0
 cyc_count = 0
 cyc_resol = 0
@@ -66,3 +66,5 @@ title_base = ''
 title_name = ''
 calc_dir = ""
 batch = ''
+batch2 = ''
+batch3 = ''
