@@ -103,6 +103,8 @@ def read_and_calc(target):
 				strain = tmp_strain
 				if strain > var.cyc_deform_max:
 					var.cyc_deform_max = strain
+			elif abs(tmp_strain) < 1e-3:
+				strain = 0.
 			else:
 				strain = float(var.cyc_deform_max) + tmp_strain
 		elif var.cyc_def_mode == 'stretch':
@@ -258,8 +260,8 @@ def script_content():
 		var.script += 'a(x)=G*(x-1./x**2.)\n'
 		var.script += 'p(x)=G*(1.-2./func)*(x-1./x**2.)\n\n' 
 	elif var.cyc_def_mode == 'shear':
-		var.script += 'a(x)=2*G*x\n'
-		var.script += 'p(x)=2*G*(1.-2./func)*x\n\n'
+		var.script += 'a(x)=G*x\n'
+		var.script += 'p(x)=G*(1.-2./func)*x\n\n'
 	var.script += 'plot '
 	for i in range(len(var.ss_data)):
 		var.script += 'data ind ' + str(i) + ' w l lw 2 lt ' + str(i+1) + ' ti "#' + str(i) + '", \\\n'
@@ -279,8 +281,8 @@ def script_content():
 		var.script += 'a(x)=G*(x-1./x**2.)\n'
 		var.script += 'p(x)=G*(1.-2./func)*(x-1./x**2.)\n\n' 
 	elif var.cyc_def_mode == 'shear':
-		var.script += 'a(x)=2*G*x\n'
-		var.script += 'p(x)=2*G*(1.-2./func)*x\n\n'
+		var.script += 'a(x)=G*x\n'
+		var.script += 'p(x)=G*(1.-2./func)*x\n\n'
 	var.script += f'set label 1 sprintf("Hyst. Loss Ratio = %.2f", {var.hystloss:}) at graph 0.1, 0.65\n\n'
 	var.script += 'plot '
 	var.script += 'data ind ' + str(len(var.ss_data)+1) + ' w l lw 2 lt 1 ti "Smoothed", \\\n'
