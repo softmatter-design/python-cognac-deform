@@ -16,23 +16,18 @@ from scipy.signal import savgol_filter
 import evaluate_deform.variables as var
 ###########################################################
 def cyclic_deform():
+	read_arg()
 	if var.f_average:
 		average()
 		# plot_ave()
 	else:
-		setup()
+		file_listing()
 		calc_stress_all()
 		# post_calc()
 		# save_data('SS.dat')
 		# plot_ss()
 	return
 
-##############
-def setup():
-	read_arg()
-	file_listing()
-	return
-2
 # Read argument 
 def read_arg():
 	parser = argparse.ArgumentParser(description='Evaluate deformed simulations !')
@@ -128,18 +123,45 @@ def read_and_calc(target):
 # 	return
 
 def average():
-	skip = 1
-	n = len(var.ss_data) - skip
-	if var.cyc_def_mode == 'shear':
-		tmp = [[0.,0.] for i in range(len(var.ss_data[0]))]
-	elif var.cyc_def_mode == 'stretch':
-		tmp = [[1.0,0.] for i in range(len(var.ss_data[0]))]
-	for data in var.ss_data[1:]:
-		for j, line in enumerate(data):
-			tmp[j][0] = float(line[0])
-			tmp[j][1] += float(line[1])
-	for data in tmp:
-		var.average.append([data[0], data[1]/n])
+	result_dic = {}
+	for direction in ['Forward', 'Backward']:
+		name_dic = {}
+		tmp_list = glob.glob('./*/*' + direction + '.dat')
+		for file in tmp_list:
+			# 下の引数は、No_0_Forward.dat の数字部分：ここでは 0
+			name_dic.setdefault(file.rsplit('\\', 1)[1].split('_')[1], []).append(file)
+		
+		for key in name_dic.keys():
+			id = direction + '_' + key
+			data_dic = {}
+			ave_list = []
+			for filename in name_dic[key]:
+				with open(filename, 'r') as f:
+					for line in f.readlines():
+						if line[0] not in ['#', '\n']:
+							data_dic.setdefault(line.split()[0], []).append(float(line.split()[1]))
+			for key in data_dic.keys():
+				ave = sum(data_dic[key])/len(data_dic[key])
+				ave_list.append([key, ave])
+
+			result_dic[id] = ave_list
+
+	for key in result_dic:
+		print(result_dic[key])
+
+
+	# skip = 1
+	# n = len(var.ss_data) - skip
+	# if var.cyc_def_mode == 'shear':
+	# 	tmp = [[0.,0.] for i in range(len(var.ss_data[0]))]
+	# elif var.cyc_def_mode == 'stretch':
+	# 	tmp = [[1.0,0.] for i in range(len(var.ss_data[0]))]
+	# for data in var.ss_data[1:]:
+	# 	for j, line in enumerate(data):
+	# 		tmp[j][0] = float(line[0])
+	# 		tmp[j][1] += float(line[1])
+	# for data in tmp:
+	# 	var.average.append([data[0], data[1]/n])
 	return
 
 def smooth():
