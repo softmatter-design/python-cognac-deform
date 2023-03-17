@@ -18,9 +18,9 @@ import evaluate_deform.variables as var
 def cyclic_deform():
 	setup()
 	calc_stress_all()
-	post_calc()
-	save_data()
-	plot_ss()
+	# post_calc()
+	# save_data('SS.dat')
+	# plot_ss()
 	return
 
 ##############
@@ -65,13 +65,16 @@ def file_listing():
 ############################
 # Calculate stress either for shear or stretch deformation
 def calc_stress_all():
-	var.ss_data = []
 	for list in var.sorted_udf:
-		tmp_data = []
+		# tmp_data = []
 		for target in list:
 			print("Readin file = ", target)
-			tmp_data.extend(read_and_calc(target))
-		var.ss_data.append(tmp_data)
+			data_name = target.rsplit('_', 1)[0]
+			datalist = read_and_calc(target)
+			var.cyc_ss_dic[data_name] = datalist[0]
+			save_each_data(data_name+'.dat', datalist)
+			# tmp_data.append(datalist)
+		# var.ss_data.append(tmp_data)
 	return
 
 # Read Data
@@ -101,10 +104,6 @@ def read_and_calc(target):
 					var.cyc_deform_max = strain
 			else:
 				strain = float(var.cyc_deform_max) + tmp_strain
-			# if target.split('_')[1] == 'Forward':
-			# 	strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
-			# else:
-			# 	strain = float(var.cyc_deform_max) + float(uobj.get('Structure.Unit_Cell.Shear_Strain'))
 		elif var.cyc_def_mode == 'stretch':
 			cell = uobj.get("Structure.Unit_Cell.Cell_Size")
 			stress_list = uobj.get("Statistics_Data.Stress.Total.Batch_Average")
@@ -112,9 +111,6 @@ def read_and_calc(target):
 			strain = uobj.get("Structure.Unit_Cell.Cell_Size.c")/z_init
 
 		data.append([str(strain), stress])
-	#
-	# if var.cyc_def_mode == 'shear' and target.split('_')[1] == 'Forward':
-	# 	var.cyc_deform_max = strain
 	return data
 
 ##########################
@@ -178,8 +174,8 @@ def integral(func):
 
 ########################################
 # 計算結果をターゲットファイル名で保存
-def save_data():
-	with open('SS.dat', 'w') as f:
+def save_data(name):
+	with open(name, 'w') as f:
 		f.write('# Strain\tStress\n\n')
 		for data in var.ss_data:
 			for line in data:
@@ -195,6 +191,16 @@ def save_data():
 		for data in var.smoothed_b:
 			f.write(f'{data[0]:}\t{data[1]:}\n')
 
+	return
+
+########################################
+# 計算結果をターゲットファイル名で保存
+def save_each_data(filename, datalist):
+	with open(filename, 'w') as f:
+		f.write('# Strain\tStress\n\n')
+		for line in datalist:
+			f.write(str(line[0]) + '\t' + str(line[1]) + '\n')
+		f.write('\n\n')
 	return
 
 ############################

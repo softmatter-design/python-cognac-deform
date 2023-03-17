@@ -409,65 +409,65 @@ def set_rotate_dir_sim(rotate):
 	u.jump(1)
 	u.eraseRecord(record_pos=0, record_num=u.totalRecord()-1)
 	if rotate != 'base':
-		rotate_position_sim(u, rotate)
+		rotate_position(u, rotate)
 	u.write(var.base_udf)
 	return
 
-# アトムのポジションを回転
-def rotate_position_sim(u, axis):
-	R = rotate_sim(axis, np.pi/2.)
-	u.jump(u.totalRecord() - 1)
-	pos = u.get('Structure.Position.mol[].atom[]')
-	for i, mol in enumerate(pos):
-		for j, atom in enumerate(mol):
-			tmp = list(np.dot(np.array(R), np.array(atom)))
-			u.put(tmp, 'Structure.Position.mol[].atom[]', [i, j])
-	return
+# # アトムのポジションを回転
+# def rotate_position_sim(u, axis):
+# 	R = rotate_sim(axis, np.pi/2.)
+# 	u.jump(u.totalRecord() - 1)
+# 	pos = u.get('Structure.Position.mol[].atom[]')
+# 	for i, mol in enumerate(pos):
+# 		for j, atom in enumerate(mol):
+# 			tmp = list(np.dot(np.array(R), np.array(atom)))
+# 			u.put(tmp, 'Structure.Position.mol[].atom[]', [i, j])
+# 	return
 
-def rotate_sim(axis, deg):
-	if axis == 'x':
-		R = [
-			[1., 0., 0.],
-			[0., np.cos(deg), -1*np.sin(deg)],
-			[0., np.sin(deg), np.cos(deg)]
-		]
-	elif axis == 'y':
-		R = [
-			[np.cos(deg), 0., np.sin(deg)],
-			[0., 1., 0.],
-			[-1*np.sin(deg), 0., np.cos(deg)]
-		]
-	elif axis == 'z':
-		R = [
-			[np.cos(deg), -1*np.sin(deg), 0.],
-			[np.sin(deg), np.cos(deg), 0.],
-			[0., 0., 1.]
-		]
-	elif axis == 'yx':
-		Ry = [
-			[np.cos(deg), 0., np.sin(deg)],
-			[0., 1., 0.],
-			[-1*np.sin(deg), 0., np.cos(deg)]
-		]
-		Rx = [
-			[1., 0., 0.],
-			[0., np.cos(deg), -1*np.sin(deg)],
-			[0., np.sin(deg), np.cos(deg)]
-		]
-		R = list(np.dot(np.array(Rx), np.array(Ry)))
-	elif axis == 'zx':
-		Rz = [
-			[np.cos(deg), -1*np.sin(deg), 0.],
-			[np.sin(deg), np.cos(deg), 0.],
-			[0., 0., 1.]
-		]
-		Rx = [
-			[1., 0., 0.],
-			[0., np.cos(deg), -1*np.sin(deg)],
-			[0., np.sin(deg), np.cos(deg)]
-		]
-		R = list(np.dot(np.array(Rx), np.array(Rz)))
-	return R
+# def rotate_sim(axis, deg):
+# 	if axis == 'x':
+# 		R = [
+# 			[1., 0., 0.],
+# 			[0., np.cos(deg), -1*np.sin(deg)],
+# 			[0., np.sin(deg), np.cos(deg)]
+# 		]
+# 	elif axis == 'y':
+# 		R = [
+# 			[np.cos(deg), 0., np.sin(deg)],
+# 			[0., 1., 0.],
+# 			[-1*np.sin(deg), 0., np.cos(deg)]
+# 		]
+# 	elif axis == 'z':
+# 		R = [
+# 			[np.cos(deg), -1*np.sin(deg), 0.],
+# 			[np.sin(deg), np.cos(deg), 0.],
+# 			[0., 0., 1.]
+# 		]
+# 	elif axis == 'yx':
+# 		Ry = [
+# 			[np.cos(deg), 0., np.sin(deg)],
+# 			[0., 1., 0.],
+# 			[-1*np.sin(deg), 0., np.cos(deg)]
+# 		]
+# 		Rx = [
+# 			[1., 0., 0.],
+# 			[0., np.cos(deg), -1*np.sin(deg)],
+# 			[0., np.sin(deg), np.cos(deg)]
+# 		]
+# 		R = list(np.dot(np.array(Rx), np.array(Ry)))
+# 	elif axis == 'zx':
+# 		Rz = [
+# 			[np.cos(deg), -1*np.sin(deg), 0.],
+# 			[np.sin(deg), np.cos(deg), 0.],
+# 			[0., 0., 1.]
+# 		]
+# 		Rx = [
+# 			[1., 0., 0.],
+# 			[0., np.cos(deg), -1*np.sin(deg)],
+# 			[0., np.sin(deg), np.cos(deg)]
+# 		]
+# 		R = list(np.dot(np.array(Rx), np.array(Rz)))
+# 	return R
 
 # ファイル名を設定し、バッチファイルを作成
 def set_udf_batch_sim(rotate):
@@ -557,8 +557,6 @@ def setup_cyclic_deform():
 	option = ''
 	make_batch_series(var.cyc_dirlist, var.cyc_dir, '_deform.bat', option)
 
-	var.batch3 += 'cyclic_deform.py -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m shear\n'
-	write_batchfile(var.calc_dir, 'eval.sh', var.batch3)
 	return
 
 def set_cyclic_basedir():
@@ -574,8 +572,8 @@ def set_each_cycle():
 	for id, cyc_def_max in enumerate(var.cyc_deform_max_list):
 		for cyc_rate in var.cyc_ratelist[id]:
 			var.batch = "#!/bin/bash\n"
-			var.batch2 = '#PJM -L "node=1 "\n'
-			var.batch2 += '#PJM -L "rscgrp=small "\n'
+			var.batch2 = '#PJM -L "node=1"\n'
+			var.batch2 += '#PJM -L "rscgrp=small"\n'
 			var.batch2 += '#PJM -L "elapse=72:00:00"\n'
 			var.batch2 += '#PJM -g hp220245\n'
 			var.batch2 += '#PJM -x PJM_LILO_GFSCACHE=/vol0004\n'
@@ -597,7 +595,38 @@ def set_cyclic_dir(cyc_def_max, cyc_rate, id):
 		os.makedirs(middle_dir)
 
 	set_cyclic_rotation(middle_dir, cyc_def_max, cyc_rate, id)
-
+	#
+	calc_all = '#!/bin/sh\n'
+	calc_all += 'cd ./rotate_base\n'
+	calc_all += 'sh calc_all.sh &\n'
+	calc_all += 'cd ../rotate_x\n'
+	calc_all += 'sh calc_all.sh &\n'
+	calc_all += 'cd ../rotate_y\n'
+	calc_all += 'sh calc_all.sh &\n'
+	calc_all += 'cd ../rotate_yx\n'
+	calc_all += 'sh calc_all.sh &\n'
+	calc_all += 'cd ../rotate_z\n'
+	calc_all += 'sh calc_all.sh &\n'
+	calc_all += 'cd ../rotate_zx\n'
+	calc_all += 'sh calc_all.sh &\n'
+	calc_all += 'cd ..\n'
+	write_batchfile(middle_dir, 'calc_all.sh', calc_all)
+	#
+	eval_all = '#!/bin/sh\n'
+	eval_all += 'cd ./rotate_base\n'
+	eval_all += 'sh eval.sh\n'
+	eval_all += 'cd ../rotate_x\n'
+	eval_all += 'sh eval.sh\n'
+	eval_all += 'cd ../rotate_y\n'
+	eval_all += 'sh eval.sh\n'
+	eval_all += 'cd ../rotate_yx\n'
+	eval_all += 'sh eval.sh\n'
+	eval_all += 'cd ../rotate_z\n'
+	eval_all += 'sh eval.sh\n'
+	eval_all += 'cd ../rotate_zx\n'
+	eval_all += 'sh eval.sh\n'
+	eval_all += 'cd ..\n'
+	write_batchfile(middle_dir, 'eval_all.sh', eval_all)
 	return
 
 def set_cyclic_rotation(middle_dir, cyc_def_max, cyc_rate, id):
@@ -632,64 +661,9 @@ def set_cyc_rotate_dir(middle_dir, rotate, cyc_def_max, cyc_rate, id):
 
 	return
 
-# アトムのポジションを回転
-def rotate_position(u, axis):
-	R = rotate(axis, np.pi/2.)
-	u.jump(u.totalRecord() - 1)
-	pos = u.get('Structure.Position.mol[].atom[]')
-	for i, mol in enumerate(pos):
-		for j, atom in enumerate(mol):
-			tmp = list(np.dot(np.array(R), np.array(atom)))
-			u.put(tmp, 'Structure.Position.mol[].atom[]', [i, j])
-	return
-
-def rotate(axis, deg):
-	if axis == 'x':
-		R = [
-			[1., 0., 0.],
-			[0., np.cos(deg), -1*np.sin(deg)],
-			[0., np.sin(deg), np.cos(deg)]
-		]
-	elif axis == 'y':
-		R = [
-			[np.cos(deg), 0., np.sin(deg)],
-			[0., 1., 0.],
-			[-1*np.sin(deg), 0., np.cos(deg)]
-		]
-	elif axis == 'z':
-		R = [
-			[np.cos(deg), -1*np.sin(deg), 0.],
-			[np.sin(deg), np.cos(deg), 0.],
-			[0., 0., 1.]
-		]
-	elif axis == 'yx':
-		Ry = [
-			[np.cos(deg), 0., np.sin(deg)],
-			[0., 1., 0.],
-			[-1*np.sin(deg), 0., np.cos(deg)]
-		]
-		Rx = [
-			[1., 0., 0.],
-			[0., np.cos(deg), -1*np.sin(deg)],
-			[0., np.sin(deg), np.cos(deg)]
-		]
-		R = list(np.dot(np.array(Rx), np.array(Ry)))
-	elif axis == 'zx':
-		Rz = [
-			[np.cos(deg), -1*np.sin(deg), 0.],
-			[np.sin(deg), np.cos(deg), 0.],
-			[0., 0., 1.]
-		]
-		Rx = [
-			[1., 0., 0.],
-			[0., np.cos(deg), -1*np.sin(deg)],
-			[0., np.sin(deg), np.cos(deg)]
-		]
-		R = list(np.dot(np.array(Rx), np.array(Rz)))
-	return R
-
 # ファイル名を設定し、バッチファイルを作成
 def make_cycle_batch(cyc_def_max, cyc_rate, id):
+	repeatcount = ''
 	for var.cyc_count in range(var.cyc_repeat[id]):
 		var.cyc_resol = var.cyc_resolution[id]
 		make_cycle(cyc_def_max, cyc_rate)
@@ -697,11 +671,36 @@ def make_cycle_batch(cyc_def_max, cyc_rate, id):
 			var.batch += 'evaluate_cyclic_deform -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m stretch\n'
 		elif var.cyclic_deform == 'CyclicShear':
 			var.batch += 'evaluate_cyclic_deform -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m shear\n'
+		repeatcount += str(var.cyc_count) + ' '
 	# バッチファイルを作成
 	write_batchfile(var.calc_dir, '_deform.bat', var.batch)
-	var.batch3 = '#!/bin/sh\n'
-	var.batch3 += 'cyclic_deform.py -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m shear\n'
-	write_batchfile(var.calc_dir, 'eval.sh', var.batch3)
+	#
+	evaluate = '#!/bin/sh\n'
+	evaluate += 'cyclic_deform.py -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m shear\n'
+	write_batchfile(var.calc_dir, 'eval.sh', evaluate)
+	# 
+	calcall = '#!/bin/sh\n'
+	calcall += 'for no in ' + repeatcount + '\n'
+	calcall += 'do\n'
+	calcall += "  JID=`pjsub -z jid No_${no}_Forward.sh`\n"
+	calcall += "  if [ $? -ne 0 ]; then   \n"           
+	calcall += "    exit 1\n"
+	calcall += "  fi\n"
+	calcall += "  set -- `pjwait $JID`   \n"             
+	calcall += "  if [ $2 != '0' -o $3 != '0' ]; then\n" 
+	calcall += "    exit 1    \n"                      
+	calcall += "  fi\n"
+	calcall += "  JID=`pjsub -z jid No_${no}_Backward.sh`  \n"   
+	calcall += "  if [ $? -ne 0 ]; then  \n"            
+	calcall += "    exit 1\n"
+	calcall += "  fi\n"
+	calcall += "  set -- `pjwait $JID`    \n"            
+	calcall += "  if [ $2 != '0' -o $3 != '0' ]; then\n" 
+	calcall += "    exit 1     \n"                       
+	calcall += "  fi\n"
+	calcall += "done   \n"
+	write_batchfile(var.calc_dir, 'calc_all.sh', calcall)
+
 	return
 #
 def make_cycle(cyc_def_max, cyc_rate):
@@ -711,14 +710,17 @@ def make_cycle(cyc_def_max, cyc_rate):
 		uin = 'No_' +str(var.cyc_count) + var.cyc_direction + "_uin.udf"
 		uout = uin.replace("uin", "out")
 		var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uout + ' -n ' + str(var.core) +' \n'
-		var.batch2 += '${COGNAC} -I ' + uin + ' -O ' + uout + ' -n 48 \n'
-		
+		calc_sh = var.batch2 + '${COGNAC} -I ' + uin + ' -O' + uout + ' -n 48 \n'
+		# バッチファイルを作成
+		write_batchfile(var.calc_dir, 'No_' +str(var.cyc_count) + var.cyc_direction + ".sh", calc_sh)
+
 		udf_in =  os.path.join(var.calc_dir, uin)
-		
+		if var.cyc_count == 0 and var.cyc_direction == '_Forward':
+			var.cyc_readudf = 'base.udf'
 		mod_cycle_udf(cyc_def_max, cyc_rate, udf_in)
 		var.cyc_readudf = uout
-		# バッチファイルを作成
-		write_batchfile(var.calc_dir, 'No_' +str(var.cyc_count) + var.cyc_direction + ".sh", var.batch2)
+		
+		
 	return
 
 #-----
@@ -781,6 +783,8 @@ def mod_cycle_udf(cyc_def_max, cyc_rate, udf_in):
 	#--- Write UDF ---
 	u.write(udf_in)
 	return
+
+
 
 #####
 #

@@ -12,6 +12,7 @@ script = ''
 # variables for cyclic
 cyc_def_mode = ''
 cyc_deform_max = 0.
+cyc_ss_dic = {}
 average = []
 smoothed_f = []
 smoothed_b = []
