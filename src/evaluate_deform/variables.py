@@ -2,7 +2,7 @@
 simple_def_mode = ''
 func = 4
 nu = 0.1
-f_aaverage = False
+f_average = False
 sorted_udf = []
 ss_data = []
 ss_data_list = []

@@ -16,11 +16,15 @@ from scipy.signal import savgol_filter
 import evaluate_deform.variables as var
 ###########################################################
 def cyclic_deform():
-	setup()
-	calc_stress_all()
-	# post_calc()
-	# save_data('SS.dat')
-	# plot_ss()
+	if var.f_average:
+		average()
+		# plot_ave()
+	else:
+		setup()
+		calc_stress_all()
+		# post_calc()
+		# save_data('SS.dat')
+		# plot_ss()
 	return
 
 ##############
@@ -35,7 +39,7 @@ def read_arg():
 	parser.add_argument('-f','--func', type=int, help="Functionality of junction point (int).")
 	parser.add_argument('-n', '--nu', type=float, help="Strand density of network (float).")
 	parser.add_argument('-m', '--mode', help="Mode of deformation; shear or stretch")
-	# parser.add_argument('-d', '--deform', help="Maximum value of deformation")
+	parser.add_argument('-a', '--average', help="Average multi data of different deformation", action='store_true')
 	args = parser.parse_args()
 	if args.func and args.nu:
 		var.func = args.func
@@ -48,6 +52,8 @@ def read_arg():
 	else:
 		print('\n#####\ndeformation mode is not set!')
 		sys.exit('either mode of shear or stretch should be set!')
+	if args.average:
+		var.f_average = True
 	return
 
 # File Select
@@ -115,11 +121,11 @@ def read_and_calc(target):
 
 ##########################
 #
-def post_calc():
-	average()
-	smooth()
-	calc_hystloss()
-	return
+# def post_calc():
+# 	average()
+# 	smooth()
+# 	calc_hystloss()
+# 	return
 
 def average():
 	skip = 1

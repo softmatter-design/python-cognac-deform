@@ -16,7 +16,7 @@ import evaluate_deform.variables as var
 ###########################################################
 def simple_deform():
 	read_arg()
-	if var.f_aaverage:
+	if var.f_average:
 		average()
 		plot_ave()
 	else:
@@ -25,6 +25,7 @@ def simple_deform():
 		save_data()
 		plot()
 	return
+
 
 ##############
 # Read argument 
@@ -48,7 +49,7 @@ def read_arg():
 		print('\n#####\ndeformation mode is not set!')
 		print('according to file name(shear or stretch), evaluation mode  will be set!')
 	if args.average:
-		var.f_aaverage = True
+		var.f_average = True
 	return
 # File Select
 def file_listing():
