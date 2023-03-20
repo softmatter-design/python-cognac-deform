@@ -26,9 +26,9 @@ sim_dirlist = []
 # Cyclic deformation
 cyclic_deform = ''
 cyc_deform_cond_dic = {}
-cyc_repeat = []
-cyc_ratelist = []
-cyc_resolution = []
+# cyc_repeat = []
+# cyc_ratelist = []
+# cyc_resolution = []
 
 cyc_dir = ''
 cyc_readudf = ''
