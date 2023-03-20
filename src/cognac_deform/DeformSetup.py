@@ -11,6 +11,7 @@ import platform
 import sys
 
 import cognac_deform.variables as var
+################
 ##### Main #####
 def deform():
 	# 各種条件を読み取り
@@ -266,10 +267,12 @@ def read_condition():
 	elif var.cyclic_deform == 'CyclicShear':
 		tmp = u.get('CycleDeformation.CyclicShear.ShearConditions[]')
 	for data in tmp:
-		var.cyc_deform_max_list.append(data[0])
-		var.cyc_repeat.append(data[1])
-		var.cyc_ratelist.append(data[2])
-		var.cyc_resolution.append(data[3])
+		max_strain, repeat, ratelist, resolution = data
+		var.cyc_deform_cond_dic[max_strain] = [repeat, ratelist, resolution]
+		# var.cyc_deform_max_list.append(data[0])
+		# var.cyc_repeat.append(data[1])
+		# var.cyc_ratelist.append(data[2])
+		# var.cyc_resolution.append(data[3])
 	# Step Deformation
 	var.step_deform = u.get('StepDeformation.StepDeform')
 	if var.step_deform == 'StepShear':
@@ -309,12 +312,13 @@ def init_calc():
 		text += "################################################" + "\n"
 	if var.cyclic_deform != 'none':
 		text += "Cyclic Deform mode:\t\t\t" + str(var.cyclic_deform) + "\n"
-		for i in range(len(var.cyc_deform_max_list)):
-			text += f'Cyclic condition #{i}\n'
-			text += f"\tMaximum Strain:\t\t\t{var.cyc_deform_max_list[i]:.1f}\n"
-			text += f"\tRepeat:\t\t\t\t{var.cyc_repeat[i]}\n"
-			text += "\tCyclic Deform Rate:\t" + ', '.join([f"{x:.1e}" for x in var.cyc_ratelist[i]]) + "\n"
-			text += "\tResolution:\t\t\t" + str(round(var.cyc_resolution[i], 4)) + "\n"
+		count = 0
+		for key in var.cyc_deform_cond_dic:
+			text += f'Cyclic condition #{count}\n'
+			text += f"\tMaximum Strain:\t\t\t{key:.1f}\n"
+			text += f"\tRepeat:\t\t\t\t{var.cyc_deform_cond_dic[key][0]}\n"
+			text += "\tCyclic Deform Rate:\t" + ', '.join([f"{x:.1e}" for x in var.cyc_deform_cond_dic[key][1]]) + "\n"
+			text += "\tResolution:\t\t\t" + str(round(var.cyc_deform_cond_dic[key][2], 4)) + "\n"
 		text += "################################################" + "\n"
 	if var.step_deform != 'none':
 		text += f"Step Deform mode:\t\t\t{var.step_deform:}\n"
@@ -365,7 +369,7 @@ def set_simple_eachrate():
 	c_dir = os.getcwd().split('\\')[-1]
 	var.title_base = str(c_dir.split('_', 2)[-1]) + f"_{var.sim_deform:}_calculation_until_{var.sim_deform_max:}_"
 
-	make_batch_series([f'rate_{rate:4.0e}' for rate in var.sim_rate_list], var.sim_basedir, '_calc_all.bat', '')
+	make_batch_series([f'rate_{rate:4.0e}' for rate in var.sim_rate_list], var.sim_basedir, '')
 
 	for var.sim_rate in var.sim_rate_list:
 		var.sim_ratedir = os.path.join(var.sim_basedir, f"rate_{var.sim_rate:4.0e}")
@@ -386,11 +390,11 @@ def set_rotation_simple():
 	elif var.sim_deform == 'stretch':
 		var.step_rotate = ['base', 'x', 'y']
 	
-	make_batch_series(['rotate_' + dir for dir in var.step_rotate], var.sim_ratedir, '_deform.bat', '')
+	make_batch_series(['rotate_' + dir for dir in var.step_rotate], var.sim_ratedir, '')
 
 	for rotate in var.step_rotate:
 		set_rotate_dir_sim(rotate)
-		set_udf_batch_sim(rotate)
+		set_udf_batch_sim()
 	return
 
 def set_rotate_dir_sim(rotate):
@@ -413,76 +417,32 @@ def set_rotate_dir_sim(rotate):
 	u.write(var.base_udf)
 	return
 
-# # アトムのポジションを回転
-# def rotate_position_sim(u, axis):
-# 	R = rotate_sim(axis, np.pi/2.)
-# 	u.jump(u.totalRecord() - 1)
-# 	pos = u.get('Structure.Position.mol[].atom[]')
-# 	for i, mol in enumerate(pos):
-# 		for j, atom in enumerate(mol):
-# 			tmp = list(np.dot(np.array(R), np.array(atom)))
-# 			u.put(tmp, 'Structure.Position.mol[].atom[]', [i, j])
-# 	return
-
-# def rotate_sim(axis, deg):
-# 	if axis == 'x':
-# 		R = [
-# 			[1., 0., 0.],
-# 			[0., np.cos(deg), -1*np.sin(deg)],
-# 			[0., np.sin(deg), np.cos(deg)]
-# 		]
-# 	elif axis == 'y':
-# 		R = [
-# 			[np.cos(deg), 0., np.sin(deg)],
-# 			[0., 1., 0.],
-# 			[-1*np.sin(deg), 0., np.cos(deg)]
-# 		]
-# 	elif axis == 'z':
-# 		R = [
-# 			[np.cos(deg), -1*np.sin(deg), 0.],
-# 			[np.sin(deg), np.cos(deg), 0.],
-# 			[0., 0., 1.]
-# 		]
-# 	elif axis == 'yx':
-# 		Ry = [
-# 			[np.cos(deg), 0., np.sin(deg)],
-# 			[0., 1., 0.],
-# 			[-1*np.sin(deg), 0., np.cos(deg)]
-# 		]
-# 		Rx = [
-# 			[1., 0., 0.],
-# 			[0., np.cos(deg), -1*np.sin(deg)],
-# 			[0., np.sin(deg), np.cos(deg)]
-# 		]
-# 		R = list(np.dot(np.array(Rx), np.array(Ry)))
-# 	elif axis == 'zx':
-# 		Rz = [
-# 			[np.cos(deg), -1*np.sin(deg), 0.],
-# 			[np.sin(deg), np.cos(deg), 0.],
-# 			[0., 0., 1.]
-# 		]
-# 		Rx = [
-# 			[1., 0., 0.],
-# 			[0., np.cos(deg), -1*np.sin(deg)],
-# 			[0., np.sin(deg), np.cos(deg)]
-# 		]
-# 		R = list(np.dot(np.array(Rx), np.array(Rz)))
-# 	return R
-
 # ファイル名を設定し、バッチファイルを作成
-def set_udf_batch_sim(rotate):
-	var.batch = "#!/bin/bash\n"
+def set_udf_batch_sim():
 	# UDFファイル名を設定
 	uin = f'rate_{var.sim_rate:4.0e}_uin.udf'
-	# 
-	make_title(var.title_name)
+	var.batch = "#!/bin/bash\n"
 
-	var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(var.core) +' \n'
-	var.batch += f'evaluate_simple_deform -f {str(var.func):} -n {str(var.nu):} -m {var.sim_deform:} \n'
-	udf_in =  os.path.join(var.calc_dir, uin)
-	make_simpledeform_udf(udf_in)
+	if platform.system() == "Windows":
+		make_title(var.title_name)
+		target_bat = '_calc_all.bat'
+		var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(var.core) +' \n'
+		var.batch += f'evaluate_simple_deform -f {str(var.func):} -n {str(var.nu):} -m {var.sim_deform:} \n'
+		udf_in =  os.path.join(var.calc_dir, uin)
+		make_simpledeform_udf(udf_in)
+	elif platform.system() == "Linux":
+		target_bat = 'calc_all.sh'
+		var.batch = '#PJM -L "node=1"\n'
+		var.batch += '#PJM -L "rscgrp=small"\n'
+		var.batch += '#PJM -L "elapse=72:00:00"\n'
+		var.batch += '#PJM -g hp220245\n'
+		var.batch += '#PJM -x PJM_LILO_GFSCACHE=/vol0004\n'
+		var.batch += '#PJM -S\n'
+		var.batch += 'export UDF_DEF_PATH="/vol0400/data/hp220245/octa/OCTA84/ENGINES/udf"\n'
+		var.batch += 'COGNAC="/vol0400/data/hp220245/octa/OCTA84/ENGINES/bin/unknown/cognac112"\n\n'
+		var.batch += '${COGNAC} -I ' + uin + ' -O' + uin.replace("uin", "out") + ' -n 48 \n'
 
-	write_batchfile(var.calc_dir, '_deform.bat',var.batch)
+	write_batchfile(var.calc_dir, target_bat, var.batch)
 	return
 
 #-----
@@ -553,9 +513,6 @@ def setup_cyclic_deform():
 	set_cyclic_basedir()
 	#
 	set_each_cycle()
-	#
-	option = ''
-	make_batch_series(var.cyc_dirlist, var.cyc_dir, '_deform.bat', option)
 
 	return
 
@@ -569,80 +526,46 @@ def set_cyclic_basedir():
 	return
 #
 def set_each_cycle():
-	for id, cyc_def_max in enumerate(var.cyc_deform_max_list):
-		for cyc_rate in var.cyc_ratelist[id]:
-			var.batch = "#!/bin/bash\n"
-			var.batch2 = '#PJM -L "node=1"\n'
-			var.batch2 += '#PJM -L "rscgrp=small"\n'
-			var.batch2 += '#PJM -L "elapse=72:00:00"\n'
-			var.batch2 += '#PJM -g hp220245\n'
-			var.batch2 += '#PJM -x PJM_LILO_GFSCACHE=/vol0004\n'
-			var.batch2 += '#PJM -S\n'
-			var.batch2 += 'export UDF_DEF_PATH="/vol0400/data/hp220245/octa/OCTA84/ENGINES/udf"\n'
-			var.batch2 += 'COGNAC="/vol0400/data/hp220245/octa/OCTA84/ENGINES/bin/unknown/cognac112"\n\n'
-
-			set_cyclic_dir(cyc_def_max, cyc_rate, id)
-
+	for cyc_def_max in var.cyc_deform_cond_dic:
+		for cyc_rate in var.cyc_deform_cond_dic[cyc_def_max][1]:
+			set_cyclic_dir(cyc_def_max, cyc_rate)
+	make_batch_series(var.cyc_dirlist, var.cyc_dir, '')
 	return
 # 
-def set_cyclic_dir(cyc_def_max, cyc_rate, id):
+def set_cyclic_dir(cyc_def_max, cyc_rate):
 	cond_dir = 'Deform_until_' + str(cyc_def_max).replace('.', '_') + "_rate_" + f"{cyc_rate:.1e}".replace('.', '_')
+	var.cyc_dirlist.append(cond_dir)
 	middle_dir = os.path.join(var.cyc_dir, cond_dir)
 	if os.path.exists(middle_dir):
 		print("Use existing dir of ", middle_dir)
 	else:
 		print("Make new dir of ", middle_dir)
 		os.makedirs(middle_dir)
-
-	set_cyclic_rotation(middle_dir, cyc_def_max, cyc_rate, id)
-	#
-	calc_all = '#!/bin/sh\n'
-	calc_all += 'cd ./rotate_base\n'
-	calc_all += 'sh calc_all.sh &\n'
-	calc_all += 'cd ../rotate_x\n'
-	calc_all += 'sh calc_all.sh &\n'
-	calc_all += 'cd ../rotate_y\n'
-	calc_all += 'sh calc_all.sh &\n'
-	calc_all += 'cd ../rotate_yx\n'
-	calc_all += 'sh calc_all.sh &\n'
-	calc_all += 'cd ../rotate_z\n'
-	calc_all += 'sh calc_all.sh &\n'
-	calc_all += 'cd ../rotate_zx\n'
-	calc_all += 'sh calc_all.sh &\n'
-	calc_all += 'cd ..\n'
-	write_batchfile(middle_dir, 'calc_all.sh', calc_all)
-	#
-	eval_all = '#!/bin/sh\n'
-	eval_all += 'cd ./rotate_base\n'
-	eval_all += 'sh eval.sh\n'
-	eval_all += 'cd ../rotate_x\n'
-	eval_all += 'sh eval.sh\n'
-	eval_all += 'cd ../rotate_y\n'
-	eval_all += 'sh eval.sh\n'
-	eval_all += 'cd ../rotate_yx\n'
-	eval_all += 'sh eval.sh\n'
-	eval_all += 'cd ../rotate_z\n'
-	eval_all += 'sh eval.sh\n'
-	eval_all += 'cd ../rotate_zx\n'
-	eval_all += 'sh eval.sh\n'
-	eval_all += 'cd ..\n'
-	write_batchfile(middle_dir, 'eval_all.sh', eval_all)
+	set_cyclic_rotation(middle_dir, cyc_def_max, cyc_rate)
 	return
 
-def set_cyclic_rotation(middle_dir, cyc_def_max, cyc_rate, id):
+def set_cyclic_rotation(middle_dir, cyc_def_max, cyc_rate):
 	if var.cyclic_deform == 'CyclicShear':
 		var.cyc_rotate = ['base', 'x', 'y', 'z', 'yx', 'zx']
 	elif var.cyclic_deform == 'CyclicStretch':
 		var.cyc_rotate = ['base', 'x', 'y']
+	calcsh = '#!/bin/sh\n'
+	evalsh = '#!/bin/sh\n'
 	for rotate in var.cyc_rotate:
-		set_cyc_rotate_dir(middle_dir, rotate, cyc_def_max, cyc_rate, id)
-		# set_cyc_udf_batch(rotate)
+		calcsh += 'cd ./' + f'rotate_{rotate}' + '\n'
+		calcsh += 'sh calc_all.sh &\n'
+		calcsh += '../'
+		evalsh += 'cd ./' + f'rotate_{rotate}' + '\n'
+		evalsh += 'sh eval.sh &\n'
+		evalsh += '../'
+		set_cyc_rotate_dir(middle_dir, rotate, cyc_def_max, cyc_rate)
+	
+	write_batchfile(middle_dir, 'calc_all.sh', calcsh)
+	write_batchfile(middle_dir, 'eval_all.sh', evalsh)
 	return
 
-def set_cyc_rotate_dir(middle_dir, rotate, cyc_def_max, cyc_rate, id):
+def set_cyc_rotate_dir(middle_dir, rotate, cyc_def_max, cyc_rate):
 	tmp_dir = f'rotate_{rotate}'
-
-	# var.cyc_dirlist.append(tmp_dir)
 	var.calc_dir = os.path.join(middle_dir, tmp_dir)
 	if os.path.exists(var.calc_dir):
 		print("Use existing dir of ", var.calc_dir)
@@ -657,70 +580,81 @@ def set_cyc_rotate_dir(middle_dir, rotate, cyc_def_max, cyc_rate, id):
 		rotate_position(u, rotate)
 	u.write(var.base_udf)
 
-	make_cycle_batch(cyc_def_max, cyc_rate, id)
+	make_cycle_batch(cyc_def_max, cyc_rate)
 
 	return
 
 # ファイル名を設定し、バッチファイルを作成
-def make_cycle_batch(cyc_def_max, cyc_rate, id):
+def make_cycle_batch(cyc_def_max, cyc_rate):
 	repeatcount = ''
-	for var.cyc_count in range(var.cyc_repeat[id]):
-		var.cyc_resol = var.cyc_resolution[id]
+	for var.cyc_count in range(var.cyc_deform_cond_dic[cyc_def_max][0]):
+		var.cyc_resol = var.cyc_deform_cond_dic[cyc_def_max][2]
 		make_cycle(cyc_def_max, cyc_rate)
-		if var.cyclic_deform == 'CyclicStretch':
-			var.batch += 'evaluate_cyclic_deform -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m stretch\n'
-		elif var.cyclic_deform == 'CyclicShear':
-			var.batch += 'evaluate_cyclic_deform -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m shear\n'
 		repeatcount += str(var.cyc_count) + ' '
-	# バッチファイルを作成
-	write_batchfile(var.calc_dir, '_deform.bat', var.batch)
+		if platform.system() == "Windows":
+			if var.cyclic_deform == 'CyclicStretch':
+				var.batch += 'evaluate_cyclic_deform -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m stretch\n'
+			elif var.cyclic_deform == 'CyclicShear':
+				var.batch += 'evaluate_cyclic_deform -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m shear\n'
+			
+			# バッチファイルを作成
+			write_batchfile(var.calc_dir, '_deform.bat', var.batch)
 	#
-	evaluate = '#!/bin/sh\n'
-	evaluate += 'cyclic_deform.py -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m shear\n'
-	write_batchfile(var.calc_dir, 'eval.sh', evaluate)
-	# 
-	calcall = '#!/bin/sh\n'
-	calcall += 'for no in ' + repeatcount + '\n'
-	calcall += 'do\n'
-	calcall += "  JID=`pjsub -z jid No_${no}_Forward.sh`\n"
-	calcall += "  if [ $? -ne 0 ]; then   \n"           
-	calcall += "    exit 1\n"
-	calcall += "  fi\n"
-	calcall += "  set -- `pjwait $JID`   \n"             
-	calcall += "  if [ $2 != '0' -o $3 != '0' ]; then\n" 
-	calcall += "    exit 1    \n"                      
-	calcall += "  fi\n"
-	calcall += "  JID=`pjsub -z jid No_${no}_Backward.sh`  \n"   
-	calcall += "  if [ $? -ne 0 ]; then  \n"            
-	calcall += "    exit 1\n"
-	calcall += "  fi\n"
-	calcall += "  set -- `pjwait $JID`    \n"            
-	calcall += "  if [ $2 != '0' -o $3 != '0' ]; then\n" 
-	calcall += "    exit 1     \n"                       
-	calcall += "  fi\n"
-	calcall += "done   \n"
-	write_batchfile(var.calc_dir, 'calc_all.sh', calcall)
+	if platform.system() == "Linux":
+		evaluate = '#!/bin/sh\n'
+		evaluate += 'cyclic_deform.py -f ' + str(var.func) + ' -n ' + str(var.nu) + ' -m shear\n'
+		write_batchfile(var.calc_dir, 'eval.sh', evaluate)
+		# 
+		calcall = '#!/bin/sh\n'
+		calcall += 'for no in ' + repeatcount + '\n'
+		calcall += 'do\n'
+		calcall += "  JID=`pjsub -z jid No_${no}_Forward.sh`\n"
+		calcall += "  if [ $? -ne 0 ]; then   \n"           
+		calcall += "    exit 1\n"
+		calcall += "  fi\n"
+		calcall += "  set -- `pjwait $JID`   \n"             
+		calcall += "  if [ $2 != '0' -o $3 != '0' ]; then\n" 
+		calcall += "    exit 1    \n"                      
+		calcall += "  fi\n"
+		calcall += "  JID=`pjsub -z jid No_${no}_Backward.sh`  \n"   
+		calcall += "  if [ $? -ne 0 ]; then  \n"            
+		calcall += "    exit 1\n"
+		calcall += "  fi\n"
+		calcall += "  set -- `pjwait $JID`    \n"            
+		calcall += "  if [ $2 != '0' -o $3 != '0' ]; then\n" 
+		calcall += "    exit 1     \n"                       
+		calcall += "  fi\n"
+		calcall += "done   \n"
+		write_batchfile(var.calc_dir, 'calc_all.sh', calcall)
 
 	return
 #
 def make_cycle(cyc_def_max, cyc_rate):
+	var.batch = "#!/bin/bash\n"
+	# UDFファイル名を設定
+	uin = 'No_' +str(var.cyc_count) + var.cyc_direction + "_uin.udf"
+	uout = uin.replace("uin", "out")
 	for var.cyc_direction in ['_Forward', '_Backward']:
-		make_title(var.title_name + "_Calculating_Cycle_until_" + str(cyc_def_max).replace('.', '_') + "_rate_" + f"{cyc_rate:.1e}".replace('.','_') + '_#' + str(var.cyc_count) + var.cyc_direction)
-		# UDFファイル名を設定
-		uin = 'No_' +str(var.cyc_count) + var.cyc_direction + "_uin.udf"
-		uout = uin.replace("uin", "out")
-		var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uout + ' -n ' + str(var.core) +' \n'
-		calc_sh = var.batch2 + '${COGNAC} -I ' + uin + ' -O' + uout + ' -n 48 \n'
-		# バッチファイルを作成
-		write_batchfile(var.calc_dir, 'No_' +str(var.cyc_count) + var.cyc_direction + ".sh", calc_sh)
-
+		if platform.system() == "Windows":
+			make_title(var.title_name + "_Calculating_Cycle_until_" + str(cyc_def_max).replace('.', '_') + "_rate_" + f"{cyc_rate:.1e}".replace('.','_') + '_#' + str(var.cyc_count) + var.cyc_direction)
+			var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uout + ' -n ' + str(var.core) +' \n'
+		elif platform.system() == "Linux":
+			calc_sh = '#PJM -L "node=1"\n'
+			calc_sh += '#PJM -L "rscgrp=small"\n'
+			calc_sh += '#PJM -L "elapse=72:00:00"\n'
+			calc_sh += '#PJM -g hp220245\n'
+			calc_sh += '#PJM -x PJM_LILO_GFSCACHE=/vol0004\n'
+			calc_sh += '#PJM -S\n'
+			calc_sh += 'export UDF_DEF_PATH="/vol0400/data/hp220245/octa/OCTA84/ENGINES/udf"\n'
+			calc_sh += 'COGNAC="/vol0400/data/hp220245/octa/OCTA84/ENGINES/bin/unknown/cognac112"\n\n'
+			calc_sh += '${COGNAC} -I ' + uin + ' -O' + uout + ' -n 48 \n'
+			# バッチファイルを作成
+			write_batchfile(var.calc_dir, 'No_' +str(var.cyc_count) + var.cyc_direction + ".sh", calc_sh)
 		udf_in =  os.path.join(var.calc_dir, uin)
 		if var.cyc_count == 0 and var.cyc_direction == '_Forward':
 			var.cyc_readudf = 'base.udf'
 		mod_cycle_udf(cyc_def_max, cyc_rate, udf_in)
 		var.cyc_readudf = uout
-		
-		
 	return
 
 #-----
@@ -1029,25 +963,27 @@ def write_batchfile(dir, filename, batch_file):
 	with open(f_batch, 'w') as f:
 		f.write(batch_file)
 	if platform.system() == "Linux":
-		os.chmod(f_batch, 0o777)
+		os.chmod(f_batch, 0o744)
 	return
 
 #######################################
 # サブディレクトリを使うバッチファイルを作成
-def make_batch_series(subdir_list, dir, target_bat, option):
+def make_batch_series(subdir_list, dir, option):
 	batch_series = ''
 	for subdir in subdir_list:
 		if platform.system() == "Windows":
+			target_bat = '_calc_all.bat'
 			batch_series += 'cd /d %~dp0\\' + subdir +'\n'
 			batch_series += 'call ' + target_bat + '\n'
 			batch_series += 'cd /d %~dp0\n'
 		elif platform.system() == "Linux":
+			target_bat = 'calc_all.sh'
 			batch_series += 'cd ./' + subdir +'\n'
-			batch_series += './' + target_bat + '\n'
+			batch_series += 'sh ' + target_bat + '\n'
 			batch_series += 'cd ../\n'
 		if option != '':
 			batch_series += option
-	write_batchfile(dir, '_calc_all.bat', batch_series)
+	write_batchfile(dir, target_bat, batch_series)
 	return
 
 
