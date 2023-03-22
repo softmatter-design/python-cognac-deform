@@ -554,10 +554,10 @@ def set_cyclic_rotation(middle_dir, cyc_def_max, cyc_rate):
 	for rotate in var.cyc_rotate:
 		calcsh += 'cd ./' + f'rotate_{rotate}' + '\n'
 		calcsh += 'sh calc_all.sh &\n'
-		calcsh += '../'
+		calcsh += 'cd ../\n'
 		evalsh += 'cd ./' + f'rotate_{rotate}' + '\n'
 		evalsh += 'sh eval.sh &\n'
-		evalsh += '../'
+		evalsh += 'cd ../\n'
 		set_cyc_rotate_dir(middle_dir, rotate, cyc_def_max, cyc_rate)
 	
 	write_batchfile(middle_dir, 'calc_all.sh', calcsh)
@@ -979,11 +979,12 @@ def make_batch_series(subdir_list, dir, option):
 		elif platform.system() == "Linux":
 			target_bat = 'calc_all.sh'
 			batch_series += 'cd ./' + subdir +'\n'
-			batch_series += 'sh ' + target_bat + '\n'
+			if var.simple_def_mode != 'none':
+				batch_series += 'pjsub ' + target_bat + '\n'
+			else:
+				batch_series += 'sh ' + target_bat + '\n'
 			batch_series += 'cd ../\n'
 		if option != '':
 			batch_series += option
 	write_batchfile(dir, target_bat, batch_series)
 	return
-
-
