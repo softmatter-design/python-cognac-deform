@@ -376,6 +376,10 @@ def set_simple_eachrate():
 	elif platform.system() == "Linux":
 		task = 'sh calc_all.sh\n'
 		filename = 'calc_all.sh'
+		#
+		task2 = 'sh eval_all.sh\n'
+		filename2 = 'eval_all.sh'
+		make_batch_series([f'rate_{rate:4.0e}' for rate in var.sim_rate_list], var.sim_basedir, task2, filename2,'')
 	make_batch_series([f'rate_{rate:4.0e}' for rate in var.sim_rate_list], var.sim_basedir, task, filename,'')
 
 	for var.sim_rate in var.sim_rate_list:
@@ -566,6 +570,10 @@ def set_each_cycle():
 	elif platform.system() == "Linux":
 		task = 'sh calc_all.sh\n'
 		filename = 'calc_all.sh'
+		#
+		task2 = 'sh eval_all.sh\n'
+		filename2 = 'eval_all.sh'
+		make_batch_series(var.cyc_dirlist, var.cyc_dir, task2, filename2,'')
 	make_batch_series(var.cyc_dirlist, var.cyc_dir, task, filename,'')
 	return
 
@@ -995,3 +1003,8 @@ def make_batch_series(subdir_list, dir, task, filename, option):
 		batch_series += option
 	write_batchfile(dir, filename, batch_series)
 	return
+
+##########################
+# Main
+if __name__=='__main__':
+	deform()
