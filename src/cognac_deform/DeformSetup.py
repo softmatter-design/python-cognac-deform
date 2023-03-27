@@ -747,12 +747,7 @@ def setup_step_deform():
 	set_step_basedir()
 	# 
 	set_rotation_step()
-	#
-	if var.step_deform == 'StepStretch':
-		option = f'evaluate_step_deform -f {var.func} -n {var.nu} -m stretch -a\n'
-	elif var.step_deform == 'StepShear':
-		option = f'evaluate_step_deform -f {var.func} -n {var.nu} -m shear -a\n'
-	make_batch_series(var.step_dirlist, var.step_dir, '_deform.bat', option)
+	
 	return
 	
 # 
@@ -774,7 +769,29 @@ def set_rotation_step():
 	for rotate in var.step_rotate:
 		set_rotate_dir(rotate)
 		set_udf_batch(rotate)
-
+	#
+	if platform.system() == "Windows":
+		task = 'call calc_all.bat\n'
+		filename = 'calc_all.bat'
+		#
+		if var.step_deform == 'StepStretch':
+			option = f'evaluate_step_deform -f {var.func} -n {var.nu} -m stretch -a\n'
+		elif var.step_deform == 'StepShear':
+			option = f'evaluate_step_deform -f {var.func} -n {var.nu} -m shear -a\n'
+	elif platform.system() == "Linux":
+		task = 'sh calc_all.sh &\n'
+		filename = 'calc_all.sh'
+		option = ''
+		#
+		task2 = 'sh eval.sh\n'
+		filename2 = 'eval_all.sh'
+		if var.step_deform == 'StepStretch':
+			option2 = f'step_deform.py -f {var.func} -n {var.nu} -m stretch -a\n'
+		elif var.step_deform == 'StepShear':
+			option2 = f'step_deform.py -f {var.func} -n {var.nu} -m shear -a\n'
+		make_batch_series(var.step_dirlist, var.step_dir, task2, filename2, option2)
+	
+	make_batch_series(var.step_dirlist, var.step_dir, task, filename, option)
 	return
 
 def set_rotate_dir(rotate):
@@ -852,31 +869,78 @@ def rotate(axis, deg):
 	return R
 
 def set_udf_batch(rotate):
-	var.batch = "#!/bin/bash\n"
 	# UDFファイル名を設定
 	base = f'{var.step_deform}_until_' + f'{var.step_deform_max:.1e}'.replace('.', '_') + '_rate_' + f'{var.step_rate:.1e}'.replace('.', '_') + f'_{rotate}'
-	#
-	make_title(var.title_name + '_' + base + "_deform")
 	uin = 'deform_uin.udf'
-	var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(var.core) +' \n'
+	uout = uin.replace("uin", "out")
+	if platform.system() == "Windows":
+		make_title(var.title_name + '_' + base + "_deform")
+		var.batch = "#!/bin/bash\n"
+		var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uout + ' -n ' + str(var.core) +' \n'
+	elif platform.system() == "Linux":
+		calc_sh = '#PJM -L "node=1"\n'
+		calc_sh += '#PJM -L "rscgrp=small"\n'
+		calc_sh += '#PJM -L "elapse=72:00:00"\n'
+		calc_sh += '#PJM -g hp220245\n'
+		calc_sh += '#PJM -x PJM_LILO_GFSCACHE=/vol0004\n'
+		calc_sh += '#PJM -S\n'
+		calc_sh += 'export UDF_DEF_PATH="/vol0400/data/hp220245/octa/OCTA84/ENGINES/udf"\n'
+		calc_sh += 'COGNAC="/vol0400/data/hp220245/octa/OCTA84/ENGINES/bin/unknown/cognac112"\n\n'
+		calc_sh += '${COGNAC} -I ' + uin + ' -O' + uout + ' -n 48 \n'
+		# バッチファイルを作成
+		write_batchfile(var.calc_dir, f'deform.sh', calc_sh)
+		#
+		calc_all = "#!/bin/bash\n"
+		calc_all += 'JID=`pjsub -z jid deform.sh`\n'
+		calc_all += 'if [ $? -ne 0 ]; then\n'
+		calc_all += 'exit 1\n'
+		calc_all += 'fi\n'
+		calc_all += 'set -- `pjwait $JID`\n'
+		calc_all += 'if [ $2 != "0" -o $3 != "0" ]; then\n'
+		calc_all += 'exit 1\n'
+		calc_all += 'fi\n'
 	udf_in =  os.path.join(var.calc_dir, uin)
 	make_stepdeform_udf(udf_in)
 	prev_udf = uin.replace("uin", "out")
 	#
 	for i, condition in enumerate(var.step_relaxation):
-		make_title(var.title_name + '_' + base + f'_relaxation_{i}')
 		uin = f'relaxation_{i}_uin.udf'
-		var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uin.replace("uin", "out") + ' -n ' + str(var.core) +' \n'
+		uout = uin.replace("uin", "out")
+		if platform.system() == "Windows":
+			make_title(var.title_name + '_' + base + f'_relaxation_{i}')
+			var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uout + ' -n ' + str(var.core) +' \n'
+		elif platform.system() == "Linux":
+			calc_sh = '#PJM -L "node=1"\n'
+			calc_sh += '#PJM -L "rscgrp=small"\n'
+			calc_sh += '#PJM -L "elapse=72:00:00"\n'
+			calc_sh += '#PJM -g hp220245\n'
+			calc_sh += '#PJM -x PJM_LILO_GFSCACHE=/vol0004\n'
+			calc_sh += '#PJM -S\n'
+			calc_sh += 'export UDF_DEF_PATH="/vol0400/data/hp220245/octa/OCTA84/ENGINES/udf"\n'
+			calc_sh += 'COGNAC="/vol0400/data/hp220245/octa/OCTA84/ENGINES/bin/unknown/cognac112"\n\n'
+			calc_sh += '${COGNAC} -I ' + uin + ' -O' + uout + ' -n 48 \n'
+			# バッチファイルを作成
+			write_batchfile(var.calc_dir, f'relaxation_{i:}.sh', calc_sh)
+			#
+			calc_all += f'pjsub relaxation_{i:}.sh\n'
 		udf_in =  os.path.join(var.calc_dir, uin)
 		make_steprelax_udf(udf_in, prev_udf, condition)
-		prev_udf = uin.replace("uin", "out")
 	#
-	if var.step_deform == 'StepStretch':
-		var.batch += f'evaluate_step_deform -f {var.func} -n {var.nu} -m stretch\n'
-	elif var.step_deform == 'StepShear':
-		var.batch += f'evaluate_step_deform -f {var.func} -n {var.nu} -m shear\n'
-	# バッチファイルを作成
-	write_batchfile(var.calc_dir, '_deform.bat', var.batch)
+	if platform.system() == "Windows":
+		if var.step_deform == 'StepStretch':
+			var.batch += f'evaluate_step_deform -f {var.func} -n {var.nu} -m stretch\n'
+		elif var.step_deform == 'StepShear':
+			var.batch += f'evaluate_step_deform -f {var.func} -n {var.nu} -m shear\n'
+		# バッチファイルを作成
+		write_batchfile(var.calc_dir, 'deform.bat', var.batch)
+	elif platform.system() == "Linux":
+		eval = "#!/bin/bash\n"
+		if var.step_deform == 'StepStretch':
+			eval += f'step_deform.py -f {var.func} -n {var.nu} -m stretch\n'
+		elif var.step_deform == 'StepShear':
+			eval += f'step_deform.py -f {var.func} -n {var.nu} -m shear\n'
+		write_batchfile(var.calc_dir, 'eval.sh', eval)
+		write_batchfile(var.calc_dir, 'calc_all.sh', calc_all)
 	return
 
 #-----

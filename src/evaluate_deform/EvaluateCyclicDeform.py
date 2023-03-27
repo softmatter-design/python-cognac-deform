@@ -6,6 +6,7 @@ from UDFManager import *
 import argparse
 import numpy as np
 import glob
+import os
 import platform
 import subprocess
 import sys
@@ -131,26 +132,26 @@ def average():
 		tmp_list = glob.glob('./*/*' + direction + '.dat')
 		for file in tmp_list:
 			# 下の引数は、No_0_Forward.dat の数字部分：ここでは 0
-			name_dic.setdefault(file.rsplit('\\', 1)[1].split('_')[1], []).append(file)
-		
-		for key in name_dic.keys():
-			id = direction + '_' + key
+			name_dic.setdefault(file.rsplit(os.sep, 1)[1].split('_')[1], []).append(file)
+		for n_repeat in name_dic.keys():
+			id = direction + '_' + n_repeat
 			data_dic = {}
 			ave_list = []
-			for filename in name_dic[key]:
+			for filename in name_dic[n_repeat]:
 				with open(filename, 'r') as f:
 					for line in f.readlines():
 						if line[0] not in ['#', '\n']:
 							data_dic.setdefault(line.split()[0], []).append(float(line.split()[1]))
-			for key in data_dic.keys():
-				ave = sum(data_dic[key])/len(data_dic[key])
-				ave_list.append([key, ave])
+		for key in data_dic.keys():
+			ave = sum(data_dic[key])/len(data_dic[key])
+			ave_list.append([key, ave])
 
-			result_dic[id] = ave_list
+		result_dic[id] = ave_list
 
 	for key in result_dic:
-		print(result_dic[key])
-
+		with open(key+'.dat', 'w') as f:
+			for line in result_dic[key]:
+				f.write(str(line[0]) + '\t' + str(line[1]) + '\n')
 
 	# skip = 1
 	# n = len(var.ss_data) - skip
