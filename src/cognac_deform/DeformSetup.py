@@ -580,23 +580,25 @@ def set_each_cycle():
 def set_cyclic_rotation(middle_dir, cyc_def_max, cyc_rate):
 	if var.cyclic_deform == 'CyclicShear':
 		var.cyc_rotate = ['base', 'x', 'y', 'z', 'yx', 'zx']
+		deform = 'shear'
 	elif var.cyclic_deform == 'CyclicStretch':
 		var.cyc_rotate = ['base', 'x', 'y']
+		deform = 'stretch'
 	for rotate in var.cyc_rotate:
 		set_cyc_rotate_dir(middle_dir, rotate, cyc_def_max, cyc_rate)
 	# プラットフォームに応じて命令を変更
 	if platform.system() == "Windows":
-		task = 'calc.bat\n'
+		task = 'call calc.bat\n'
 		filename = 'calc_all.bat'
-		option = f'evaluate_cyclic_deform -f {str(var.func):} -n {str(var.nu):} -m {var.sim_deform:} -a \n'
+		option = f'evaluate_cyclic_deform -f {str(var.func):} -n {str(var.nu):} -m {deform:} -a \n'
 	elif platform.system() == "Linux":
-		task = 'pjsub calc.sh\n'
+		task = 'sh calc.sh\n'
 		filename = 'calc_all.sh'
 		option = ''
 		# 評価用のバッチを作成
 		task2 = 'sh eval.sh\n'
 		filename2 = 'eval_all.sh'
-		option2 = f'cyclic_deform.py -f {str(var.func):} -n {str(var.nu):} -m {var.sim_deform:} -a \n'
+		option2 = f'cyclic_deform.py -f {str(var.func):} -n {str(var.nu):} -m {deform:} -a \n'
 		make_batch_series(['rotate_' + dir for dir in var.cyc_rotate], middle_dir, task2, filename2, option2)
 	make_batch_series(['rotate_' + dir for dir in var.cyc_rotate], middle_dir, task, filename, option)
 	return
@@ -654,7 +656,7 @@ def make_cycle(cyc_def_max, cyc_rate, rotate, calc_all, jobname):
 		uin = 'No_' +str(var.cyc_count) + var.cyc_direction + "_uin.udf"
 		uout = uin.replace("uin", "out")
 		if platform.system() == "Windows":
-			make_title(var.title_name + "_Calculating_Cycle_until_" + str(cyc_def_max).replace('.', '_') + "_rate_" + f"{cyc_rate:.1e}".replace('.','_') + '_#' + str(var.cyc_count) + var.cyc_direction)
+			make_title(var.title_name + "_Calculating_Cycle_until_" + str(cyc_def_max).replace('.', '_') + "_rate_" + f"{cyc_rate:.1e}".replace('.','_') + '_No' + str(var.cyc_count) + var.cyc_direction)
 			var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uout + ' -n ' + str(var.core) +' \n'
 		elif platform.system() == "Linux":
 			calc_sh = '#PJM -L "node=1"\n'

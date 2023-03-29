@@ -58,6 +58,7 @@ def file_listing():
 	udf_list = glob.glob(target)
 	if udf_list:
 		tmp = sorted(udf_list, reverse=True)
+		print(tmp)
 		for i in range(int(len(tmp)/2)):
 			var.sorted_udf.append(tmp[-2*(i+1):len(tmp)-2*i])
 	else:
@@ -67,6 +68,7 @@ def file_listing():
 ############################
 # Calculate stress either for shear or stretch deformation
 def calc_stress_all():
+	print(var.sorted_udf)
 	for list in var.sorted_udf:
 		# tmp_data = []
 		for target in list:
@@ -92,6 +94,7 @@ def read_and_calc(target):
 	else:
 		uobj.jump(1)
 		vol = uobj.get("Statistics_Data.Volume.Batch_Average")
+		print(vol)
 		area_init = vol**(2./3.)
 		z_init = vol**(1./3.)
 	for i in range(1, uobj.totalRecord()):
@@ -136,35 +139,23 @@ def average():
 		for n_repeat in name_dic.keys():
 			id = direction + '_' + n_repeat
 			data_dic = {}
-			ave_list = []
 			for filename in name_dic[n_repeat]:
 				with open(filename, 'r') as f:
 					for line in f.readlines():
 						if line[0] not in ['#', '\n']:
 							data_dic.setdefault(line.split()[0], []).append(float(line.split()[1]))
-		for key in data_dic.keys():
-			ave = sum(data_dic[key])/len(data_dic[key])
-			ave_list.append([key, ave])
-
-		result_dic[id] = ave_list
-
-	for key in result_dic:
-		with open(key+'.dat', 'w') as f:
-			for line in result_dic[key]:
+			ave_list = []
+			for key in data_dic.keys():
+				ave = sum(data_dic[key])/len(data_dic[key])
+				ave_list.append([key, ave])
+			result_dic[id] = ave_list
+	#
+	repeat = int(len(result_dic.keys())/2)
+	for i in range(repeat):
+		all = result_dic['Forward_' + str(i)] + result_dic['Backward_' + str(i)]
+		with open(f'No_{i:}.dat', 'w') as f:
+			for line in all:
 				f.write(str(line[0]) + '\t' + str(line[1]) + '\n')
-
-	# skip = 1
-	# n = len(var.ss_data) - skip
-	# if var.cyc_def_mode == 'shear':
-	# 	tmp = [[0.,0.] for i in range(len(var.ss_data[0]))]
-	# elif var.cyc_def_mode == 'stretch':
-	# 	tmp = [[1.0,0.] for i in range(len(var.ss_data[0]))]
-	# for data in var.ss_data[1:]:
-	# 	for j, line in enumerate(data):
-	# 		tmp[j][0] = float(line[0])
-	# 		tmp[j][1] += float(line[1])
-	# for data in tmp:
-	# 	var.average.append([data[0], data[1]/n])
 	return
 
 def smooth():
