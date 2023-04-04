@@ -147,7 +147,10 @@ def average():
 			ave_list = []
 			for key in data_dic.keys():
 				ave = sum(data_dic[key])/len(data_dic[key])
-				ave_list.append([key, ave])
+				ave_list.append([float(key), ave])
+			#
+			smoothed_list = smooth(direction, ave_list)
+			#
 			result_dic[id] = ave_list
 	#
 	repeat = int(len(result_dic.keys())/2)
@@ -158,29 +161,24 @@ def average():
 				f.write(str(line[0]) + '\t' + str(line[1]) + '\n')
 	return
 
-def smooth():
-	half = int(len(var.average)/2)
+def smooth(direction, data):
+	smoothed_list = []
+	# parameter for savgol_filter
 	length = 5
-	tmp = var.average[:half]
-	if var.cyc_def_mode == 'shear':
-		tmp.insert(0, [0.,0.])
-	elif var.cyc_def_mode == 'stretch':
-		tmp.insert(0, [1.0,0.])
-	forward = np.array(tmp)
-	backward = np.array(var.average[half-1:])
-	sf_forward = savgol_filter(forward[:,1], length, 2)
-	sf_backward = savgol_filter(backward[:,1], length, 2)
-	for i, data in enumerate(sf_forward):
-		if data > 0:
-			var.smoothed_f.append([forward[i,0], data])
+	#
+	if direction == 'Forward':
+		if var.cyc_def_mode == 'shear':
+			data.insert(0, [0.,0.])
+		elif var.cyc_def_mode == 'stretch':
+			data.insert(0, [1.0,0.])
+	dataarray = np.array(data)
+	smoothed = savgol_filter(dataarray[:,1], length, 2)
+	for i, val in enumerate(smoothed):
+		if val > 0:
+			smoothed_list.append([data[i][0], val])
 		else:
-			var.smoothed_f.append([forward[i,0], 0])
-	for i, data in enumerate(sf_backward):
-		if data > 0:
-			var.smoothed_b.append([backward[i,0], data])
-		else:
-			var.smoothed_b.append([backward[i,0], 0])
-	return
+			smoothed_list.append([data[i][0], 0.])
+	return smoothed_list
 
 def calc_hystloss():
 	accum_f = integral(var.smoothed_f)
