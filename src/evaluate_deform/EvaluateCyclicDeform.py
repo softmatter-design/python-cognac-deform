@@ -58,7 +58,6 @@ def file_listing():
 	udf_list = glob.glob(target)
 	if udf_list:
 		tmp = sorted(udf_list, reverse=True)
-		print(tmp)
 		for i in range(int(len(tmp)/2)):
 			var.sorted_udf.append(tmp[-2*(i+1):len(tmp)-2*i])
 	else:
@@ -77,8 +76,6 @@ def calc_stress_all():
 			datalist = read_and_calc(target)
 			var.cyc_ss_dic[data_name] = datalist[0]
 			save_each_data(data_name+'.dat', datalist)
-			# tmp_data.append(datalist)
-		# var.ss_data.append(tmp_data)
 	return
 
 # Read Data
@@ -94,7 +91,6 @@ def read_and_calc(target):
 	else:
 		uobj.jump(1)
 		vol = uobj.get("Statistics_Data.Volume.Batch_Average")
-		print(vol)
 		area_init = vol**(2./3.)
 		z_init = vol**(1./3.)
 	for i in range(1, uobj.totalRecord()):
@@ -110,7 +106,7 @@ def read_and_calc(target):
 			elif abs(tmp_strain) < 1e-3:
 				strain = 0.
 			else:
-				strain = float(var.cyc_deform_max) + tmp_strain
+				strain = round(float(var.cyc_deform_max) + tmp_strain, 4)
 		elif var.cyc_def_mode == 'stretch':
 			cell = uobj.get("Structure.Unit_Cell.Cell_Size")
 			stress_list = uobj.get("Statistics_Data.Stress.Total.Batch_Average")
@@ -120,22 +116,28 @@ def read_and_calc(target):
 		data.append([str(strain), stress])
 	return data
 
-##########################
-#
-# def post_calc():
-# 	average()
-# 	smooth()
-# 	calc_hystloss()
-# 	return
+########################################
+# 計算結果をターゲットファイル名で保存
+def save_each_data(filename, datalist):
+	with open(filename, 'w') as f:
+		f.write('# Strain\tStress\n\n')
+		for line in datalist:
+			f.write(str(line[0]) + '\t' + str(line[1]) + '\n')
+		f.write('\n\n')
+	return
 
+##########################
 def average():
 	result_dic = {}
+	smooth_dic = {}
+	accum_f = accum_b = 0.
 	for direction in ['Forward', 'Backward']:
 		name_dic = {}
 		tmp_list = glob.glob('./*/*' + direction + '.dat')
 		for file in tmp_list:
 			# 下の引数は、No_0_Forward.dat の数字部分：ここでは 0
 			name_dic.setdefault(file.rsplit(os.sep, 1)[1].split('_')[1], []).append(file)
+		repeat = 0
 		for n_repeat in name_dic.keys():
 			id = direction + '_' + n_repeat
 			data_dic = {}
@@ -150,15 +152,23 @@ def average():
 				ave_list.append([float(key), ave])
 			#
 			smoothed_list = smooth(direction, ave_list)
+			if direction == 'Forward':
+				accum_f += integral(smoothed_list)
+			else:
+				accum_b += integral(smoothed_list)
 			#
 			result_dic[id] = ave_list
+			smooth_dic[id] = smoothed_list
+
+			repeat += 1
 	#
-	repeat = int(len(result_dic.keys())/2)
-	for i in range(repeat):
-		all = result_dic['Forward_' + str(i)] + result_dic['Backward_' + str(i)]
-		with open(f'No_{i:}.dat', 'w') as f:
-			for line in all:
-				f.write(str(line[0]) + '\t' + str(line[1]) + '\n')
+	hystloss = (accum_f - accum_b)/ accum_f
+	#
+	save_seriesdata2('averaged', result_dic)
+	save_seriesdata2('smoothed', smooth_dic)
+
+	plot_ss(repeat, hystloss)
+
 	return
 
 def smooth(direction, data):
@@ -180,53 +190,38 @@ def smooth(direction, data):
 			smoothed_list.append([data[i][0], 0.])
 	return smoothed_list
 
-def calc_hystloss():
-	accum_f = integral(var.smoothed_f)
-	accum_b = integral(var.smoothed_b)
-	var.hystloss = (accum_f-accum_b)/accum_f
-	return
-
 def integral(func):
-	accum = 0
+	accum = 0.
 	for x in range(len(func)-1):
-		accum += (func[x][1] + func[x+1][1])*abs(func[x+1][0] - func[x][0]) 
+		accum += (func[x][1] + func[x+1][1])*abs(func[x+1][0] - func[x][0])/2.
 	return accum
 
 ########################################
 # 計算結果をターゲットファイル名で保存
-def save_data(name):
-	with open(name, 'w') as f:
-		f.write('# Strain\tStress\n\n')
-		for data in var.ss_data:
-			for line in data:
+def save_seriesdata(name, result_dic):
+	repeat = int(len(result_dic.keys())/2)
+	for i in range(repeat):
+		all = result_dic['Forward_' + str(i)] + result_dic['Backward_' + str(i)]
+		with open(name + f'_No_{i:}.dat', 'w') as f:
+			for line in all:
 				f.write(str(line[0]) + '\t' + str(line[1]) + '\n')
-			f.write('\n\n')
-		f.write('# Average\n\n')
-		for data in var.average:
-			f.write(f'{data[0]:}\t{data[1]:}\n')
-		f.write('\n\n')
-		f.write('# Smoothed\n\n')
-		for data in var.smoothed_f:
-			f.write(f'{data[0]:}\t{data[1]:}\n')
-		for data in var.smoothed_b:
-			f.write(f'{data[0]:}\t{data[1]:}\n')
-
 	return
 
-########################################
-# 計算結果をターゲットファイル名で保存
-def save_each_data(filename, datalist):
-	with open(filename, 'w') as f:
-		f.write('# Strain\tStress\n\n')
-		for line in datalist:
-			f.write(str(line[0]) + '\t' + str(line[1]) + '\n')
-		f.write('\n\n')
+def save_seriesdata2(name, result_dic):
+	repeat = int(len(result_dic.keys())/2)
+	with open(name + '.dat', 'w') as f:
+		for i in range(repeat):
+			f.write(f'# {i:}\n\n')
+			all = result_dic['Forward_' + str(i)] + result_dic['Backward_' + str(i)]
+			for line in all:
+				f.write(str(line[0]) + '\t' + str(line[1]) + '\n')
+			f.write('\n\n')
 	return
 
 ############################
 # 結果をプロット
-def plot_ss():
-	script_content()
+def plot_ss(repeat, hystloss):
+	script_content(repeat, hystloss)
 	with open('plot_ss.plt', 'w') as f:
 		f.write(var.script)
 	#
@@ -237,10 +232,10 @@ def plot_ss():
 	return
 
 # スクリプトの中身
-def script_content():
+def script_content(repeat, hystloss):
 	var.script = 'set term pngcairo font "Arial,14"\n\n'
-	var.script += '#set mono\n#set colorsequence classic\n\n'
-	var.script += 'data = "SS.dat"\n'
+	var.script += '#set mono\nset colorsequence classic\n\n'
+	var.script += 'data = "averaged.dat"\n'
 	var.script += 'set output "CyclicDeform.png"\n\n'
 	var.script += 'set key left\nset size square\n'
 	var.script += '#set xrange [1:3]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
@@ -253,15 +248,14 @@ def script_content():
 		var.script += 'a(x)=G*x\n'
 		var.script += 'p(x)=G*(1.-2./func)*x\n\n'
 	var.script += 'plot '
-	for i in range(len(var.ss_data)):
+	for i in range(repeat):
 		var.script += 'data ind ' + str(i) + ' w l lw 2 lt ' + str(i+1) + ' ti "#' + str(i) + '", \\\n'
-	var.script += 'data ind ' + str(i+1) + ' w l lw 4 lt ' + str(i+2) + ' ti "average", \\\n'
 	var.script += 'a(x) w l lw 2 lt 10 ti "Affin", \\\np(x) w l lw 2 lt 12 ti "Phantom"'
 	var.script += '\n\nreset\n\n'
 	#
 	var.script += 'set term pngcairo font "Arial,14"\n\n'
-	var.script += '#set mono\n#set colorsequence classic\n\n'
-	var.script += 'data = "SS.dat"\n'
+	var.script += '#set mono\nset colorsequence classic\n\n'
+	var.script += 'data = "smoothed.dat"\n'
 	var.script += 'set output "Smoothed.png"\n\n'
 	var.script += 'set key left\nset size square\n'
 	var.script += '#set xrange [1:3]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
@@ -273,11 +267,12 @@ def script_content():
 	elif var.cyc_def_mode == 'shear':
 		var.script += 'a(x)=G*x\n'
 		var.script += 'p(x)=G*(1.-2./func)*x\n\n'
-	var.script += f'set label 1 sprintf("Hyst. Loss Ratio = %.2f", {var.hystloss:}) at graph 0.1, 0.65\n\n'
+	var.script += f'set label 1 sprintf("Hyst. Loss Ratio = %.2f", {hystloss:}) at graph 0.1, 0.65\n\n'
 	var.script += 'plot '
-	var.script += 'data ind ' + str(len(var.ss_data)+1) + ' w l lw 2 lt 1 ti "Smoothed", \\\n'
+	for i in range(repeat):
+		var.script += 'data ind ' + str(i) + ' w l lw 2 lt ' + str(i+1) + ' ti "#' + str(i) + '", \\\n'
 	var.script += 'a(x) w l lw 2 lt 10 ti "Affin", \\\np(x) w l lw 2 lt 12 ti "Phantom"'
-	var.script += '\n\nreset'
+	var.script += '\n\nreset\n\n'
 
 	return
 
