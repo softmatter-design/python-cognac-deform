@@ -12,7 +12,6 @@ import subprocess
 import sys
 
 from scipy.signal import savgol_filter
-# from operator import itemgetter
 
 import evaluate_deform.variables as var
 ###########################################################

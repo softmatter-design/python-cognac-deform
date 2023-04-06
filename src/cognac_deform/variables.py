@@ -1,5 +1,5 @@
 # Values used for calculation
-
+deform_udf = ''
 # 使用するCognacのバージョン
 ver_Cognac = "cognac112"
 # シミュレーションに使用するコア数

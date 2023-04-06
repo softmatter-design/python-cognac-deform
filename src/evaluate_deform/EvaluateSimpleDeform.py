@@ -5,10 +5,11 @@ from UDFManager import *
 import argparse
 import numpy as np
 import glob
+from operator import itemgetter
+import os
 import platform
 import subprocess
 import sys
-from operator import itemgetter
 
 import evaluate_deform.variables as var
 ###########################################################
@@ -19,6 +20,8 @@ def simple_deform():
 	if var.f_average:
 		average()
 		plot_ave()
+	elif var.f_series:
+		series()
 	else:
 		file_listing()
 		calc_stress_all()
@@ -35,6 +38,7 @@ def read_arg():
 	parser.add_argument('-n', '--nu', type=float, help="Strand density of network (float).")
 	parser.add_argument('-m', '--mode', help="Mode of deformation; shear or stretch")
 	parser.add_argument('-a', '--average', help="Average multi data of different deformation", action='store_true')
+	parser.add_argument('-s', '--series', help="Average multi data of different deformation", action='store_true')
 	args = parser.parse_args()
 	if args.func and args.nu:
 		var.func = args.func
@@ -50,6 +54,8 @@ def read_arg():
 		print('according to file name(shear or stretch), evaluation mode  will be set!')
 	if args.average:
 		var.f_average = True
+	elif args.series:
+		var.f_series = True
 	return
 # File Select
 def file_listing():
@@ -87,8 +93,8 @@ def read_and_calc(target):
 	#
 	uobj.jump(0)
 	cell = uobj.get("Structure.Unit_Cell.Cell_Size")
-	area_init = cell[0]*cell[1]
-	z_init = cell[2]
+	# area_init = cell[0]*cell[1]
+	# z_init = cell[2]
 	for i in range(1, uobj.totalRecord()):
 		print("Reading Rec.=", i)
 		uobj.jump(i)
@@ -262,4 +268,46 @@ def script_ave():
 	var.script += 'data smooth unique w l lw 2 lt 1 ti "averaged", \\\n'
 	var.script += 'g(x) w l lw 2 lt 6 ti "g=1.5", \\\np(x) w l lw 2 lt 7 ti "Phantom"'
 	var.script += '\n\nreset'
+	return
+
+#####
+# Series
+def series():
+	dir_list = glob.glob('./*/all.dat')
+	sorted_list = sorted([[os.path.basename(os.path.dirname(x)).replace('_', ' '), os.path.abspath(x), float(os.path.basename(os.path.dirname(x)).split('_')[1])] for x in dir_list], key=itemgetter(2), reverse=True)
+	script_series(sorted_list)
+	plot_series()
+	return
+
+def plot_series():
+	if platform.system() == "Windows":
+		subprocess.call(['plot_all.plt'], shell=True)
+	elif platform.system() == "Linux":
+		subprocess.call(['gnuplot ' + 'plot_all.plt'], shell=True)
+	return
+
+# スクリプトの中身
+def script_series(sorted_list):
+	script = 'set term pngcairo font "Arial,14"\n\n'
+	script += '#set mono\nset colorsequence classic\n\n'
+	script += 'set output "series.png"\n\n'
+	script += 'set key left\nset size square\n'
+	script += 'set xlabel "Strain"\nset ylabel "Stress"\n\n'
+	script += 'G=' + str(var.nu) + '\nfunc=' + str(var.func) + '\nm=1.5\n'
+	if var.simple_def_mode == 'stretch':
+		script += '#set xrange [1:3]\n#set yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n\n'
+		script += 'p(x)=G*(1.-2./func)*(x-1./x**2.)\n' 
+		script += 'g(x)=m*p(x)\n\n'
+	elif var.simple_def_mode == 'shear':
+		script += '#set xrange [0:1]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
+		script += 'p(x)=G*(1.-2./func)*x\n\n'
+		script += 'g(x)=m*p(x)\n\n'
+	script += 'plot	'
+	for data in sorted_list:
+		script += '"' + data[1] + '" smooth unique w l lw 2 ti "' + data[0] + '", \\\n'
+	script += 'g(x) w l lw 2 lt 6 ti "g=1.5", \\\np(x) w l lw 2 lt 7 ti "Phantom"'
+	script += '\n\nreset'
+	#
+	with open('plot_all.plt', 'w') as f:
+		f.write(script)
 	return

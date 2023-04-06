@@ -58,13 +58,18 @@ def read_nw_cond():
 
 # シミュレーション条件を設定する。
 def read_sim_cond():
-	while not os.path.isfile('../deform_condition.udf'):
-		print('\nIn the parent directory, no "deform_condition.udf" is found !')
-		print('New one will be generated.')
-		print('Please, modify and save it !\n')
-		make_newudf()
-		input('Press ENTER to continue...')
-	read_and_set()
+	if os.path.isfile('deform_condition.udf'):
+		var.deform_udf = 'deform_condition.udf'
+		read_and_set()
+	else:
+		while not os.path.isfile('../deform_condition.udf'):
+			print('\nIn the parent directory, no "deform_condition.udf" is found !')
+			print('New one will be generated.')
+			print('Please, modify and save it !\n')
+			make_newudf()
+			input('Press ENTER to continue...')
+		var.deform_udf = '../deform_condition.udf'
+		read_and_set()
 	return
 
 # make new udf when not found.
@@ -238,7 +243,7 @@ def read_and_set():
 
 # Read condition udf
 def read_condition():
-	u = UDFManager('../deform_condition.udf')
+	u = UDFManager(var.deform_udf)
 	u.jump(-1)
 	# 使用するCognacのバージョン
 	var.ver_Cognac = u.get('CalcConditions.Cognac_ver')
@@ -379,7 +384,8 @@ def set_simple_eachrate():
 		#
 		task2 = 'sh eval_all.sh\n'
 		filename2 = 'eval_all.sh'
-		make_batch_series([f'rate_{rate:4.0e}' for rate in var.sim_rate_list], var.sim_basedir, task2, filename2,'')
+		option = f'simple_deform.py -f {str(var.func):} -n {str(var.nu):} -m {var.sim_deform:} -s \n'
+		make_batch_series([f'rate_{rate:4.0e}' for rate in var.sim_rate_list], var.sim_basedir, task2, filename2, option)
 	make_batch_series([f'rate_{rate:4.0e}' for rate in var.sim_rate_list], var.sim_basedir, task, filename,'')
 
 	for var.sim_rate in var.sim_rate_list:
@@ -392,7 +398,6 @@ def set_simple_eachrate():
 			os.makedirs(var.sim_ratedir)
 		#
 		set_rotation_simple()
-
 	return
 
 def set_rotation_simple():
