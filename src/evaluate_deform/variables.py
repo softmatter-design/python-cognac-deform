@@ -23,15 +23,7 @@ hystloss = 0
 step_def_mode = ''
 step_flag = 0
 ave_flag = 0
-savgol_parameter = [5, 2]
-
 step_strain = 0.
 elapsed_time = 0
-
-# gt_step = []
-# gt_step_mod = []
-global_g = []
-global_time = []
-global_temp = []
-
-step_relax_udfs = []
+stepdata_dic = {}
+savgol_parameter = [5, 2]

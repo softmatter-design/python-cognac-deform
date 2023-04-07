@@ -6,6 +6,7 @@ from UDFManager import *
 import argparse
 import numpy as np
 import glob
+import operator
 import platform
 import subprocess
 import sys
@@ -29,8 +30,6 @@ def read_arg():
 	parser.add_argument('-f','--func', type=int, help="Functionality of junction point (int).")
 	parser.add_argument('-n', '--nu', type=float, help="Strand density of network (float).")
 	parser.add_argument('-m', '--mode', help="Mode of deformation; shear or stretch")
-	# parser.add_argument('-u', '--udf', help="Setting UDF file to read")
-	# parser.add_argument('-s', '--step', help="Flag for treating step calculation", action='store_true')
 	parser.add_argument('-a', '--average', help="Flag for averaging subdir data", action='store_true')
 	args = parser.parse_args()
 	if args.func and args.nu:
@@ -44,7 +43,6 @@ def read_arg():
 	else:
 		print('\n#####\ndeformation mode is not set!')
 		sys.exit('either mode of shear or stretch should be set!')
-	# var.step_flag = args.step
 	var.ave_flag = args.average
 	return
 
@@ -66,12 +64,10 @@ def calc_step_deform(t_udf):
 	stress = []
 	temp = []
 	# データ読み込み
-	# prev_stress = 0.
-	# prev_g = 0.
 	for rec in range(1, uobj.totalRecord()):
 		print("Reading Rec.=", rec)
 		uobj.jump(rec)
-		time.append(uobj.get("Time"))
+		time.append(round(uobj.get("Time"), 4))
 		temp.append(uobj.get('Statistics_Data.Temperature.Batch_Average'))
 		if var.step_def_mode == 'stretch':
 			tmp_strain = uobj.get("Structure.Unit_Cell.Cell_Size.c")/z_init
@@ -82,22 +78,19 @@ def calc_step_deform(t_udf):
 			tmp_strain = uobj.get('Structure.Unit_Cell.Shear_Strain')
 			tmp_stress = uobj.get('Statistics_Data.Stress.Total.Batch_Average.xy')
 			tmp_g = tmp_stress/tmp_strain
-		# if tmp_stress <= 0:
-		# 	tmp_stress = prev_stress
-		# 	tmp_g = prev_g
 		strain.append(tmp_strain)
 		stress.append(tmp_stress)
 		g.append(tmp_g)
 		#
-		# prev_stress = tmp_stress
-		# prev_g = tmp_g
+		tmp_time = round(uobj.get("Time"), 4)
+		var.stepdata_dic.setdefault(tmp_time, []).append(tmp_g)
 	#
 	var.step_strain = tmp_strain
 	var.elapsed_time = time[-1]
 	#
-	var.global_time.extend(time)
-	var.global_g.extend(g)
-	var.global_temp.extend(temp)
+	# var.global_time.extend(time)
+	# var.global_g.extend(g)
+	# var.global_temp.extend(temp)
 	#
 	mod_g = savgol_filter(g, var.savgol_parameter[0], var.savgol_parameter[1])
 	#
@@ -123,10 +116,17 @@ def calc_relax_all():
 	for target in glob.glob('relax*_out.udf') :
 		print("Readin file = ", target)
 		read_relax(target)
-	
-	mod_g = savgol_filter(var.global_g, var.savgol_parameter[0], var.savgol_parameter[1])
-	total_g = np.stack([var.global_time, var.global_g, var.global_temp],1)
-	total_g_mod = np.stack([var.global_time, mod_g, var.global_temp],1)
+	#
+	gt_list = []
+	time_list = []
+	for key in var.stepdata_dic.keys():
+		ave = sum(var.stepdata_dic[key])/len(var.stepdata_dic[key])
+		time_list.append(float(key))
+		gt_list.append(ave)
+	mod_gt_list = savgol_filter(gt_list, var.savgol_parameter[0], var.savgol_parameter[1])
+
+	total_g = sorted(np.stack([time_list, gt_list], 1), key = operator.itemgetter(0))
+	total_g_mod = sorted(np.stack([time_list, mod_gt_list], 1), key = operator.itemgetter(0))
 	save_data(total_g, 'gt_all.dat')
 	save_data(total_g_mod, 'gt_all_mod.dat')
 	return
@@ -134,16 +134,9 @@ def calc_relax_all():
 #----- Read Data
 def read_relax(target):
 	uobj = UDFManager(target)
-	time = []
-	g = []
-	temp = []
-	# prev_g = 0.
 	for i in range(1, uobj.totalRecord()):
 		print("Reading Rec.=", i)
 		uobj.jump(i)
-		#
-		time.append(uobj.get("Time") + var.elapsed_time)
-		temp.append(uobj.get('Statistics_Data.Temperature.Batch_Average'))
 		#
 		if var.step_def_mode == 'stretch':
 			stress_list = uobj.get("Statistics_Data.Stress.Total.Batch_Average")
@@ -152,14 +145,9 @@ def read_relax(target):
 		elif var.step_def_mode == 'shear':
 			tmp_stress = uobj.get('Statistics_Data.Stress.Total.Batch_Average.xy')
 			tmp_g = tmp_stress/var.step_strain
-		# if tmp_g <=0:
-		# 	tmp_g = prev_g
-		g.append(tmp_g)
-		prev_g = tmp_g
-	var.global_time.extend(time)
-	var.global_g.extend(g)
-	var.global_temp.extend(temp)
-	var.elapsed_time = time[-1]
+		#
+		tmp_time = round(uobj.get("Time"), 4) + var.elapsed_time
+		var.stepdata_dic.setdefault(tmp_time, []).append(tmp_g)
 	return
 
 ###############################
@@ -194,7 +182,7 @@ def make_script(f_data):
 # スクリプトの中身
 def script_content(f_data):
 	out_png = f_data.replace('dat', 'png')
-	script = 'set term pngcairo font "Arial,14"\n\n'
+	script = 'set term pngcairo font "Arial, 14"\n\n'
 	script += 'set colorsequence classic\n\n'
 	script += 'data = "' + f_data + '"\n\n'
 	script += 'set output "' + out_png + '"\n\n'
@@ -207,6 +195,7 @@ def script_content(f_data):
 	elif f_data == 'gt_step.dat' or f_data =='gt_step_mod.dat':
 		script += 'set xlabel "Time"\nset ylabel "G(t)"\n'	
 		script += 'set logscale xy\n\n'	
+		script += 'set format x "10^{%L}"\nset format y "10^{%L}"\n'
 		script += 'plot	data u 1:2 axis x1y1 w l lw 2 lt 1 ti "G(t)"'
 	else:
 		script += f'G={var.nu:}\nfunc ={var.func:}\n'
@@ -221,6 +210,7 @@ def script_content(f_data):
 		script += 'set label 5 sprintf("{/Symbol n}k_BT = %.2e", G) at graph 0.2, 0.2\n\n'
 		script += 'set xlabel "Time"\nset ylabel "G(t)"\n'	
 		script += 'set logscale xy\n\n'	
+		script += 'set format x "10^{%L}"\nset format y "10^{%L}"\n'
 		script += 'plot	data u 1:2 axis x1y1 w l lw 2 lt 1 ti "G(t)", \\\n'
 		script += '[s:e] g(x) w l lw 2 lt 2 ti "fit", \\\n'
 		script += '[1000:] G w l lw 3 dt (10, 5) lt 8 ti "Affin", \\\n'
@@ -246,6 +236,7 @@ def script_content(f_data):
 		script += 'set label 4 sprintf("{/Symbol t} = %.1e", tau) at graph 0.2, 0.4\n'
 		script += 'set xlabel "Time"\nset ylabel "G_{mod}(t)"\n'	
 		script += 'set logscale y\n\n'	
+		script += 'set format y "10^{%L}"\n'
 		script += 'set xrange [:e2]\nset yrange [1e-3:]\n#set xtics 1\n#set ytics 0.1\n'
 		script += 'plot	data u 1:($2 - eq) axis x1y1 w l lw 2 lt 1 ti "G_{mod}(t)", \\\n'
 		script += '[s2:e2] h(x) w l lw 2 lt 2 ti "fit"'
@@ -256,19 +247,17 @@ def script_content(f_data):
 ###############################
 def average(target):
 	for name in target:
-		dat_list = glob.glob('**/' + name + '.dat', recursive = True)
-		val_list = []
+		dat_list = glob.glob('./*/' + name + '.dat', recursive = True)
+		data_dic = {}
+		res = []
 		for dat in dat_list:
 			with open(dat, 'r') as f:
-				tmp = []
-				time = []
 				for line in f.readlines():
-					tmp.append(float(line.split('\t')[1]))
-					time.append(float(line.split('\t')[0]))
-				val_list.append(tmp)
-		ave_list = np.average(np.array(val_list), axis = 0)
-		res = np.stack([time, ave_list], 1)
-		save_data(res, name + '_averaged.dat')
+					data_dic.setdefault(float(line.split('\t')[0]), []).append(float(line.split('\t')[1]))
+		for key in data_dic.keys():
+			ave = sum(data_dic[key])/len(data_dic[key])
+			res.append([float(key), ave])
+		save_data(res,  name + '_averaged.dat')
 
 
 
