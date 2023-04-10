@@ -128,7 +128,12 @@ def make_newudf():
 					}
 				Relaxation[]:{
 					RelaxationTime:int "緩和を観測する時間",
-					ClacSteps:int "緩和時間の分割数",
+					CalcSteps:int "緩和時間の分割数",
+					}
+				Repeat[]:{
+					Repeat:int "繰り返し数",
+					RelaxationTime:int "緩和を観測する時間",
+					CalcSteps:int "緩和時間の分割数",
 					}
 				}
 			}
@@ -140,6 +145,11 @@ def make_newudf():
 					DeformSteps:int "シミュレーションのステップ数"
 					}
 				Relaxation[]:{
+					RelaxationTime:int "緩和を観測する時間",
+					CalcSteps:int "緩和時間の分割数",
+					}
+				Repeat[]:{
+					Repeat:int "繰り返し数",
 					RelaxationTime:int "緩和を観測する時間",
 					CalcSteps:int "緩和時間の分割数",
 					}
@@ -203,14 +213,16 @@ def make_newudf():
 		"StepStretch",
 			{
 				{
-				{1.50,5.0e-02,100}
+				{1.50,5.0e-02,200}
 				[{100000,500}{100000,100}]
+				[{3,1000000,500}]
 				}
 			}
 			{
 				{
-				{1.00,0.10,100}
+				{1.00,0.10,200}
 				[{100000,500}{100000,100}]
+				[{3,1000000,500}]
 				}
 			}
 		}
@@ -286,14 +298,16 @@ def read_condition():
 		deform_time = var.step_deform_max/var.step_rate
 		#
 		var.step_relaxation = u.get('StepDeformation.StepShear.ShearConditions.Relaxation[]')
+		var.step_repeat = u.get('StepDeformation.StepShear.ShearConditions.Repeat[]')[0]
 	elif var.step_deform == 'StepStretch':
 		[var.step_deform_max, var.step_rate, var.step_steps] = u.get('StepDeformation.StepStretch.StretchConditions.Deformation')
 		if var.step_deform_max == 1.0:
-			sys.exit('\nStep Stretch Condition is not proper !!\nMax Deformation should not be 1.0 !')
+			sys.exit('\nStep Stretch Condition is not proper !!\nMax Deformation should be greater than 1.0 !')
 		else:
 			deform_time = abs(var.step_deform_max - 1)/var.step_rate
 		#
 		var.step_relaxation = u.get('StepDeformation.StepStretch.StretchConditions.Relaxation[]')
+		var.step_repeat = u.get('StepDeformation.StepShear.ShearConditions.Repeat[]')[0]
 	#
 	if var.step_deform != 'none':
 		dt = min(var.sim_time_div, deform_time/var.step_steps)	# dt の暫定値を決定
@@ -336,7 +350,11 @@ def init_calc():
 		for i, data in enumerate(var.step_relaxation):
 			text += f"Relaxation-{i:}\n"
 			text += f"\tRelaxation Time:\t\t{data[0]:.1e}\n"
-			text += f"\tCalc steps:\t\t\t{data[1]:}\n"
+			text += f"\tCalc. steps:\t\t\t{data[1]:}\n"
+		text += "#\n"
+		text += f'Repeat:\t\t\t\t\t{var.step_repeat[0]:}\n'
+		text += f'Relaxation steps:\t\t\t{var.step_repeat[1]:.1e}\n'
+		text += f'Calc. Steps:\t\t\t\t{var.step_repeat[2]:}\n'
 		text += "################################################" + "\n"
 	print(text)
 	return
@@ -878,6 +896,7 @@ def rotate(axis, deg):
 def set_udf_batch(rotate):
 	# UDFファイル名を設定
 	base = f'{var.step_deform}_until_' + f'{var.step_deform_max:.1e}'.replace('.', '_') + '_rate_' + f'{var.step_rate:.1e}'.replace('.', '_') + f'_{rotate}'
+	#
 	uin = 'deform_uin.udf'
 	uout = uin.replace("uin", "out")
 	if platform.system() == "Windows":
@@ -909,7 +928,8 @@ def set_udf_batch(rotate):
 	udf_in =  os.path.join(var.calc_dir, uin)
 	make_stepdeform_udf(udf_in)
 	prev_udf = uin.replace("uin", "out")
-	#
+
+	# 各放置時間における緩和計算を設定
 	for i, condition in enumerate(var.step_relaxation):
 		uin = f'relaxation_{i}_uin.udf'
 		uout = uin.replace("uin", "out")
@@ -932,6 +952,40 @@ def set_udf_batch(rotate):
 			calc_all += f'pjsub relaxation_{i:}.sh\n'
 		udf_in =  os.path.join(var.calc_dir, uin)
 		make_steprelax_udf(udf_in, prev_udf, condition)
+	
+	# 最長の緩和計算のUDFをリスタートにして長時間計算を繰り返す。
+	repeat = var.step_repeat[0]
+	for i in range(repeat):
+		condition = var.step_repeat[1:]
+		uin = f'repeat_{i}_uin.udf'
+		udf_in =  os.path.join(var.calc_dir, uin)
+		uout = uin.replace("uin", "out")
+		if platform.system() == "Windows":
+			make_title(var.title_name + '_' + base + f'_repeat_{i}')
+			var.batch += var.ver_Cognac + ' -I ' + uin + ' -O ' + uout + ' -n ' + str(var.core) +' \n'
+		elif platform.system() == "Linux":
+			calc_sh = '#PJM -L "node=1"\n'
+			calc_sh += '#PJM -L "rscgrp=small"\n'
+			calc_sh += '#PJM -L "elapse=72:00:00"\n'
+			calc_sh += '#PJM -g hp220245\n'
+			calc_sh += '#PJM -x PJM_LILO_GFSCACHE=/vol0004\n'
+			calc_sh += '#PJM -S\n'
+			calc_sh += 'export UDF_DEF_PATH="/vol0400/data/hp220245/octa/OCTA84/ENGINES/udf"\n'
+			calc_sh += 'COGNAC="/vol0400/data/hp220245/octa/OCTA84/ENGINES/bin/unknown/cognac112"\n\n'
+			calc_sh += '${COGNAC} -I ' + uin + ' -O' + uout + ' -n 48 \n'
+			# バッチファイルを作成
+			write_batchfile(var.calc_dir, f'repeat_{i:}.sh', calc_sh)
+			#
+			calc_all += f'JID=`pjsub -z jid repeat_{i:}.sh`\n'
+			calc_all += 'if [ $? -ne 0 ]; then\n'
+			calc_all += 'exit 1\n'
+			calc_all += 'fi\n'
+			calc_all += 'set -- `pjwait $JID`\n'
+			calc_all += 'if [ $2 != "0" -o $3 != "0" ]; then\n'
+			calc_all += 'exit 1\n'
+			calc_all += 'fi\n'
+		make_steprelax_udf(udf_in, prev_udf, condition)
+		prev_udf = uin.replace("uin", "out")
 	#
 	if platform.system() == "Windows":
 		if var.step_deform == 'StepStretch':

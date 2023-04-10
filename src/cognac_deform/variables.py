@@ -49,6 +49,8 @@ step_deform_time = []
 
 step_dir = ''
 step_relaxation = []
+step_repeat = []
+
 step_rotate = []
 step_dirlist = []
 
