@@ -274,7 +274,10 @@ def script_ave():
 # Series
 def series():
 	dir_list = glob.glob('./*/all.dat')
-	sorted_list = sorted([[os.path.basename(os.path.dirname(x)).replace('_', ' '), os.path.abspath(x), float(os.path.basename(os.path.dirname(x)).split('_')[1])] for x in dir_list], key=itemgetter(2), reverse=True)
+	if platform.system() == "Windows":
+		sorted_list = sorted([[os.path.basename(os.path.dirname(x)).replace('_', ' '), x.replace("\\","/"), float(os.path.basename(os.path.dirname(x)).split('_')[1])] for x in dir_list], key=itemgetter(2), reverse=True)
+	elif platform.system() == "Linux":
+		sorted_list = sorted([[os.path.basename(os.path.dirname(x)).replace('_', ' '), os.path.abspath(x), float(os.path.basename(os.path.dirname(x)).split('_')[1])] for x in dir_list], key=itemgetter(2), reverse=True)
 	script_series(sorted_list)
 	plot_series()
 	return
@@ -295,11 +298,11 @@ def script_series(sorted_list):
 	script += 'set xlabel "Strain"\nset ylabel "Stress"\n\n'
 	script += 'G=' + str(var.nu) + '\nfunc=' + str(var.func) + '\nm=1.5\n'
 	if var.simple_def_mode == 'stretch':
-		script += '#set xrange [1:3]\n#set yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n\n'
+		script += 'set xrange [1:2]\n#set yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n\n'
 		script += 'p(x)=G*(1.-2./func)*(x-1./x**2.)\n' 
 		script += 'g(x)=m*p(x)\n\n'
 	elif var.simple_def_mode == 'shear':
-		script += '#set xrange [0:1]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
+		script += 'set xrange [0:1]\nset yrange [0.:]\n#set xtics 0.5\n#set ytics 0.01\n'
 		script += 'p(x)=G*(1.-2./func)*x\n\n'
 		script += 'g(x)=m*p(x)\n\n'
 	script += 'plot	'
